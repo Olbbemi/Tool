@@ -19,7 +19,6 @@ namespace MakeParser
 
         List<TextBox> Tlist;
         TextBox ScopeBox, FtextBox, StextBox;
-
         List<Button> Blist;
         Button Pbt, Mbt;
 
@@ -31,10 +30,6 @@ namespace MakeParser
             InitializeComponent();
             check = false;
             yPos = 30; yCnt = 0; xCnt = 0; buttonCnt = 0;
-            Blist = new List<Button>();
-            Tlist = new List<TextBox>();
-            Llist = new List<Label>();
-            Xqueue = new Queue<int>();
         }
 
         private void SSaveButton_Click(object sender, EventArgs e)
@@ -89,8 +84,12 @@ namespace MakeParser
                 temp.Dispose();
             }
 
-            check = false; yPos = 30; xCnt = 0;
-            SFileText.Text = "";
+            Blist = null;    Tlist = null;
+            Llist = null;    Xqueue = null;
+
+            Wstream.Write(Environment.NewLine);
+            check = false;
+            yPos = 30; xCnt = 0; buttonCnt = 0; yCnt = 0;
             Wstream.Flush(); Wstream.Close();
             output.Close();
         }
@@ -108,6 +107,11 @@ namespace MakeParser
         {
             if (check == false)
             {
+                Blist = new List<Button>();
+                Tlist = new List<TextBox>();
+                Llist = new List<Label>();
+                Xqueue = new Queue<int>();
+
                 check = true;
                 mainScope = new Label();
                 mainScope.Name = "";

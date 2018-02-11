@@ -88,7 +88,6 @@
             this.ClientSize = new System.Drawing.Size(263, 100);
             this.Controls.Add(this.SelectPanel);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "SelectForm";
             this.Text = "SelectForm";
             this.Load += new System.EventHandler(this.SelectForm_Load);

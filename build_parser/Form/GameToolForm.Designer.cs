@@ -108,7 +108,6 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.GCreateButton);
             this.Controls.Add(this.GAddButton);
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "GameToolForm";
             this.Text = "GameToolForm";
             this.Load += new System.EventHandler(this.GameToolForm_Load);

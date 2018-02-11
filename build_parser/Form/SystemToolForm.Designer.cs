@@ -93,7 +93,6 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.SFileText);
             this.Controls.Add(this.SystemPanel);
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "SystemToolForm";
             this.Text = "SystemToolForm";
             this.Load += new System.EventHandler(this.SystemToolForm_Load);
