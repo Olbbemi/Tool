@@ -1,7 +1,11 @@
+#define UNICODE
+#define _UNICODE
+
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <tchar.h>
 #include <list>
 #define Length 200
 
@@ -10,8 +14,9 @@ using namespace std;
 class NODE
 {
 private:
-	char path[Length];
-	int size, line, check;
+	TCHAR path[Length];
+	int check;
+	size_t size, line;
 	void *ptr;
 
 public:
@@ -32,8 +37,8 @@ public:
 
 	friend class INFO;
 	friend void Write(NODE &temp, int flag);
-	friend void *operator new (size_t Size, const char *File, int Line);
-	friend void *operator new[](size_t Size, const char *File, int Line);
+	friend void *operator new (size_t Size, const TCHAR *File, int Line);
+	friend void *operator new[](size_t Size, const TCHAR *File, int Line);
 	friend void operator delete (void *p);
 	friend void operator delete[](void *p);
 
@@ -42,17 +47,17 @@ public:
 		this->ptr = ptr;
 	}
 
-	NODE(int line, const char path[])
+	NODE(int line, const TCHAR *File)
 	{
 		this->line = line;
-		strcpy_s(this->path, path);
+		_tcscpy_s(this->path, path);
 	}
 
-	NODE(int size, int line, const char path[], void *ptr)
+	NODE(int size, int line, const TCHAR *File, void *ptr)
 	{
 		this->size = size;
 		this->line = line;
-		strcpy_s(this->path, path);
+		_tcscpy_s(this->path, path);
 		this->ptr = ptr;
 	}
 };
@@ -85,29 +90,29 @@ MANAGER Manager;
 void Write(NODE &temp, int flag)
 {
 	FILE *output;
-	char buf[Length], output_str[Length] = "Memory_";
+	TCHAR buf[Length], output_str[Length] = _TEXT("Memory_");
 
 	time_t info = time(NULL);
 	struct tm local;
 	localtime_s(&local, &info);
 
-	sprintf_s(buf, sizeof(buf), "%4d%02d%02d_%02d%02d%02d", local.tm_year + 1900, local.tm_mon + 1, local.tm_yday + 1, local.tm_hour, local.tm_min, local.tm_sec);
-	strcat_s(output_str, buf);	strcat_s(output_str, ".txt");
+	_stprintf_s(buf, sizeof(buf) / sizeof(TCHAR), _TEXT("%4d%02d%02d_%02d%02d%02d"), local.tm_year + 1900, local.tm_mon + 1, local.tm_yday + 1, local.tm_hour, local.tm_min, local.tm_sec);
+	_tcscat_s(output_str, buf);	_tcscat_s(output_str, _TEXT(".txt"));
 
-	fopen_s(&output, output_str, "a");
+	_tfopen_s(&output, output_str, _TEXT("a, ccs=UTF-16LE"));
 
 	switch (flag)
 	{
-	case (unsigned int)NODE::STATUS::FAIL:		fprintf_s(output, "FAIL						       %s : %d\n", temp.path, temp.line);	break;
-	case (unsigned int)NODE::STATUS::NOALLOC:		fprintf_s(output, "NOALLOC			[0x%p]\n", temp.ptr);	break;
-	case (unsigned int)NODE::STATUS::ARRAY:		fprintf_s(output, "ARRAY			[0x%p]  [     %d]  %s : %d\n", temp.ptr, temp.size, temp.path, temp.line);	break;
-	case (unsigned int)NODE::STATUS::LEAK:		fprintf_s(output, "LEAK			[0x%p]  [     %d]  %s : %d\n", temp.ptr, temp.size, temp.path, temp.line);	break;
+		case (unsigned int)NODE::STATUS::FAIL:		_ftprintf_s(output, _TEXT("FAIL						       %s : %zd\n"), temp.path, temp.line);	break;
+		case (unsigned int)NODE::STATUS::NOALLOC:		_ftprintf_s(output, _TEXT("NOALLOC			[0x%p]\n"), temp.ptr);	break;
+		case (unsigned int)NODE::STATUS::ARRAY:		_ftprintf_s(output, _TEXT("ARRAY			[0x%p]  [     %zd]  %s : %zd\n"), temp.ptr, temp.size, temp.path, temp.line);	break;
+		case (unsigned int)NODE::STATUS::LEAK:		_ftprintf_s(output, _TEXT("LEAK			[0x%p]  [     %zd]  %s : %zd\n"), temp.ptr, temp.size, temp.path, temp.line);	break;
 	}
 
 	fclose(output);
 }
 
-void *operator new (size_t Size, const char *File, int Line)
+void* operator new (size_t Size, const TCHAR *File, int Line)
 {
 	void *ptr = (void*)malloc(Size);
 
@@ -120,7 +125,7 @@ void *operator new (size_t Size, const char *File, int Line)
 	else
 	{
 		MANAGER::LIST *temp = (MANAGER::LIST*)malloc(sizeof(MANAGER::LIST));
-		strcpy_s(temp->Node.path, File);
+		_tcscpy_s(temp->Node.path, File);
 		temp->Node.ptr = ptr;	temp->Node.size = Size;	temp->Node.line = Line;
 		temp->Node.check = (unsigned int)NODE::ARRAY::single; temp->next = NULL;
 
@@ -142,7 +147,7 @@ void *operator new (size_t Size, const char *File, int Line)
 	}
 }
 
-void *operator new[](size_t Size, const char *File, int Line)
+void* operator new[](size_t Size, const TCHAR *File, int Line)
 {
 	void *ptr = (void*)malloc(Size);
 
@@ -155,7 +160,7 @@ void *operator new[](size_t Size, const char *File, int Line)
 	else
 	{
 		MANAGER::LIST *temp = (MANAGER::LIST*)malloc(sizeof(MANAGER::LIST));
-		strcpy_s(temp->Node.path, File);
+		_tcscpy_s(temp->Node.path, File);
 		temp->Node.ptr = ptr;	temp->Node.size = Size;	temp->Node.line = Line;
 		temp->Node.check = (unsigned int)NODE::ARRAY::multi;	temp->next = NULL;
 

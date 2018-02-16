@@ -3,13 +3,14 @@
 
 PARSER::PARSER() : index(0)
 {
-	input.open("File_Name"); 
+	input.open(_TEXT("File_Name.txt"), ios_base::binary);
+	input.imbue(locale(locale(""), new Unicodecvt));
 	input.seekg(0, input.end);
 
 	length = (int)input.tellg();
 	input.seekg(0, input.beg);
 
-	buf = new char[length];
+	buf = new TCHAR[length * sizeof(TCHAR)];
 	input.read(buf, length);
 }
 
@@ -23,10 +24,10 @@ void PARSER::Init()
 	index = store = 0;
 }
 
-void PARSER::Make_Table(const char *pivot)
+void PARSER::Make_Table(const TCHAR *pivot)
 {
-	int size = strlen(pivot);
-	for (int i = 1, j = 0; i < size; i++)
+	size_t size = _tcslen(pivot), i = 1;
+	for (int j = 0; i < size; i++)
 	{
 		while (j > 0 && pivot[i] != pivot[j])
 			j = table[j - 1];
@@ -36,10 +37,10 @@ void PARSER::Make_Table(const char *pivot)
 	}
 }
 
-int PARSER::KMP(const char *pivot)
+int PARSER::KMP(const TCHAR *pivot)
 {
-	int Psize = strlen(pivot), Bsize = strlen(buf);
-	for (int i = index, j = 0; i < Bsize; i++)
+	size_t Psize = _tcslen(pivot), Bsize = _tcslen(buf), j = 0;
+	for (int i = index; i < Bsize; i++)
 	{
 		if (buf[i] == '/')
 		{
@@ -65,9 +66,9 @@ int PARSER::KMP(const char *pivot)
 	return STATUS::fail;
 }
 
-void PARSER::Find_Str(const char *str)
+void PARSER::Find_Str(const TCHAR *str)
 {
-	table.resize(strlen(str));
+	table.resize(_tcslen(str));
 	fill(table.begin(), table.end(), 0);
 	
 	Make_Table(str);
@@ -76,9 +77,9 @@ void PARSER::Find_Str(const char *str)
 	while (1)
 	{
 		if ((buf[index] == '/' && buf[index + 1] == '/') || (buf[index - 1] == '/' && buf[index] == '/'))
-			Find_Exception("//");
+			Find_Exception(_TEXT("//"));
 		else if (buf[index] == '/' && buf[index + 1] == '*')
-			Find_Exception("/*");
+			Find_Exception(_TEXT("/*"));
 		else if (buf[index] == '\'' || buf[index] == '\"' || buf[index] == '\n')
 			index++;
 		else
@@ -94,9 +95,9 @@ void PARSER::Find_Str(const char *str)
 	}
 }
 
-void PARSER::Find_Scope(const char *str)
+void PARSER::Find_Scope(const TCHAR *str)
 {
-	table.resize(strlen(str));
+	table.resize(_tcslen(str));
 	fill(table.begin(), table.end(), 0);
 	
 	Make_Table(str);
@@ -104,9 +105,9 @@ void PARSER::Find_Scope(const char *str)
 	while (1)
 	{
 		if ((buf[index] == '/' && buf[index + 1] == '/') || (buf[index - 1] == '/' && buf[index] == '/'))
-			Find_Exception("//");
+			Find_Exception(_TEXT("//"));
 		else if (buf[index] == '/' && buf[index + 1] == '*')
-			Find_Exception("/*");
+			Find_Exception(_TEXT("/*"));
 		else if (buf[index] == '\'' || buf[index] == '\"' || buf[index] == '\n')
 			index++;
 		else
@@ -115,7 +116,7 @@ void PARSER::Find_Scope(const char *str)
 
 			if (temp == STATUS::find)
 			{
-				index += 2;
+				index += 5;
 				store = index;
 				break;
 			}
@@ -131,15 +132,15 @@ void PARSER::Find_Scope(const char *str)
 	}
 }
 
-void PARSER::Find_Exception(const char *str)
+void PARSER::Find_Exception(const TCHAR *str)
 {
-	if (!strcmp(str,"//"))
+	if (!_tcscmp(str,_TEXT("//")))
 	{
 		while (buf[index] != '\n')
 			index++;
 		index++;
 	}
-	else if (!strcmp(str,"/*"))
+	else if (!_tcscmp(str,_TEXT("/*")))
 	{
 		while (buf[index - 1] != '*' || buf[index] != '/')
 			index++;
@@ -147,7 +148,7 @@ void PARSER::Find_Exception(const char *str)
 	}
 }
 
-char* PARSER::Get_Data()
+TCHAR* PARSER::Get_Data()
 {
 	while (buf[index] != '=')
 		index++;
@@ -166,27 +167,27 @@ char* PARSER::Get_Data()
 	return temp;
 }
 
-void PARSER::Get_Value(const char *str, int &data)
+void PARSER::Get_Value(const TCHAR *str, int &data)
 {
 	Find_Str(str);
-	data = atoi(Get_Data());
+	data = _ttoi(Get_Data());
 }
 
-void PARSER::Get_Value(const char *str, double &data)
+void PARSER::Get_Value(const TCHAR *str, double &data)
 {
 	Find_Str(str);
-	data = atof(Get_Data());
+	data = _ttof(Get_Data());
 }
 
-void PARSER::Get_Value(const char *str, char &data)
+void PARSER::Get_Value(const TCHAR *str, TCHAR &data)
 {
 	Find_Str(str);
-	char* temp = Get_Data();
+	TCHAR *temp = Get_Data();
 	data = temp[0];
 }
 
-void PARSER::Get_String(const char *str, char *data, int size)
+void PARSER::Get_String(const TCHAR *str, TCHAR *data, int size)
 {
 	Find_Str(str);
-	strcpy_s(data, size, Get_Data());
+	_tcscpy_s(data, size, Get_Data());
 }

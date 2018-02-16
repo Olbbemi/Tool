@@ -35,7 +35,7 @@ namespace MakeParser
         private void SaveButton_Click(object sender, EventArgs e)
         {
             FileStream output = new FileStream(GFileText.Text + ".txt", FileMode.Append, FileAccess.Write);
-            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.UTF8);
+            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.Unicode);
 
             //GridView.RowCount 통해서 현재 열의 개수 알 수 있음, 행의 개수는 boxCnt
             int row = GridView.RowCount - 1, col = boxCnt;
@@ -123,7 +123,7 @@ namespace MakeParser
         private void FileOperator()
         {
             FileStream output = new FileStream(GFileText.Text + ".txt", FileMode.Create, FileAccess.Write);
-            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.UTF8);
+            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.Unicode);
 
             Wstream.Write("|");
             foreach (TextBox temp in textList)

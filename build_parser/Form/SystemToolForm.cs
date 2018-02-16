@@ -40,7 +40,7 @@ namespace MakeParser
                 return;
 
             FileStream output = new FileStream(SFileText.Text + ".txt", FileMode.Append, FileAccess.Write);
-            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.UTF8);
+            StreamWriter Wstream = new StreamWriter(output, System.Text.Encoding.Unicode);
 
             foreach(TextBox temp in Tlist)
             {
