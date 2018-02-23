@@ -1,9 +1,10 @@
 #include <string.h>
 #include "Parsing.h"
+#include "Precompile.h"
 
 PARSER::PARSER() : index(0)
 {
-	input.open(_TEXT("File_Name.txt"), ios_base::binary);
+	input.open(_TEXT("Bitmap_Data.txt"), ios_base::binary);
 	input.imbue(locale(locale(""), new Unicodecvt));
 	input.seekg(0, input.end);
 
@@ -42,7 +43,7 @@ int PARSER::KMP(const TCHAR *pivot)
 	size_t Psize = _tcslen(pivot), Bsize = _tcslen(buf), j = 0;
 	for (int i = index; i < Bsize; i++)
 	{
-		if (buf[i] == '/')
+		if (buf[i] == '/' && buf[index + 1] == '/' || (buf[index - 1] == '/' && buf[index] == '/'))
 		{
 			index = i;
 			return STATUS::exception;
