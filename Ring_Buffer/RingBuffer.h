@@ -18,20 +18,18 @@ public:
 	int GetUseSize();
 	int GetUnuseSize();
 
-
-	void ClearBuffer();
+	char* GetFrontPtr();
+	char* GetRearPtr();
 	
 	void MoveFront(int size);
 	void MoveRear(int size);
 
-	char* GetFrontPtr();
-	char* GetRearPtr();
-
-	int RemainFrontSize();
-	int RemainRearSize();
-
+	void ClearBuffer();
+		
+	int LinearRemainFrontSize();
+	int LinearRemainRearSize();
 };
 
-#define BUFSIZE 100
+#define BUFSIZE 16
 
 #endif

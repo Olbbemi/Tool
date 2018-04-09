@@ -17,7 +17,7 @@ RINGBUFFER::~RINGBUFFER()
 int RINGBUFFER::GetUseSize()
 {
 	if (front > rear)
-		return BUFSIZE - (front - rear);	//(BUFSIZE - 1) - (front - rear) + 1; 
+		return BUFSIZE - (front - rear);	// (BUFSIZE - 1) - (front - rear) + 1; 
 	else
 		return rear - front;
 }
@@ -45,7 +45,6 @@ bool RINGBUFFER::Enqueue(char *data, int size)
 	if (gap < size)
 	{
 		memcpy_s(buffer + rear, BUFSIZE, data, gap);
-
 		memcpy_s(buffer, BUFSIZE, data + gap, size - gap);
 		rear = size - gap - 1;
 	}
@@ -76,7 +75,6 @@ bool RINGBUFFER::Dequeue(char *dest, int dest_size, int size)
 	if (gap < size)
 	{
 		memcpy_s(dest, dest_size, buffer + front, gap);
-
 		memcpy_s(dest + gap, dest_size, buffer, size - gap);
 		front = size - gap - 1;
 	}
@@ -128,26 +126,59 @@ void RINGBUFFER::ClearBuffer()
 
 char* RINGBUFFER::GetFrontPtr()
 {
-	return buffer + front;
+	int front_temp = front + 1;
+	if (front_temp == BUFSIZE)
+		front_temp = 0;
+
+	return buffer + front_temp;
 }
 
 char* RINGBUFFER::GetRearPtr()
 {
-	return buffer + rear;
+	int rear_temp = rear + 1;
+	if (rear_temp == BUFSIZE)
+		rear_temp = 0;
+
+	return buffer + rear_temp;
 }
 
 void RINGBUFFER::MoveFront(int size)
 {
-	front = (front + size);
-
+	front += size;
 	if (front >= BUFSIZE)
 		front -= BUFSIZE;
 }
 
 void RINGBUFFER::MoveRear(int size)
 {
-	rear = (rear + size);
-
+	rear += size;
 	if (rear >= BUFSIZE)
 		rear -= BUFSIZE;
+}
+
+int RINGBUFFER::LinearRemainFrontSize()
+{
+	if (front == rear)
+		return 0;
+	else
+	{
+		int front_temp = front + 1;
+		if (front_temp == BUFSIZE)	front_temp = 0;
+
+		if (front_temp > rear)
+			return BUFSIZE - front_temp;
+		else
+			return rear - front_temp + 1;
+	}
+}
+
+int RINGBUFFER::LinearRemainRearSize()
+{
+	int rear_temp = rear + 1;
+	if (rear_temp == BUFSIZE)	rear_temp = 0;
+
+	if (rear_temp > front)
+		return BUFSIZE - rear_temp;
+	else
+		return front - rear_temp;
 }
