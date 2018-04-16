@@ -12,8 +12,8 @@ public:
 	~RINGBUFFER();
 
 	bool Enqueue(char *data, int size);
-	bool Dequeue(char *dest, int dest_size, int size);
-	bool Peek(char *dest, int dest_size, int size, int *return_size);
+	bool Dequeue(char *dest, int size, int &return_size);
+	bool Peek(char *dest, int size, int &return_size);
 
 	int GetUseSize();
 	int GetUnuseSize();
@@ -29,7 +29,5 @@ public:
 	int LinearRemainFrontSize();
 	int LinearRemainRearSize();
 };
-
-#define BUFSIZE 16
 
 #endif

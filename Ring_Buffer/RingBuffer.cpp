@@ -2,6 +2,7 @@
 #include "RingBuffer.h"
 
 #include <string.h>
+#define BUFSIZE 16
 
 RINGBUFFER::RINGBUFFER()
 {
@@ -60,7 +61,7 @@ bool RINGBUFFER::Enqueue(char *data, int size)
 	return true;
 }
 
-bool RINGBUFFER::Dequeue(char *dest, int dest_size, int size)
+bool RINGBUFFER::Dequeue(char *dest, int size, int &return_size)
 {
 	int gap, using_data = GetUseSize();
 
@@ -74,23 +75,24 @@ bool RINGBUFFER::Dequeue(char *dest, int dest_size, int size)
 	gap = BUFSIZE - front;
 	if (gap < size)
 	{
-		memcpy_s(dest, dest_size, buffer + front, gap);
-		memcpy_s(dest + gap, dest_size, buffer, size - gap);
+		memcpy_s(dest, gap, buffer + front, gap);
+		memcpy_s(dest + gap, size - gap, buffer, size - gap);
 		front = size - gap - 1;
 	}
 	else
 	{
-		memcpy_s(dest, dest_size, buffer + front, size);
+		memcpy_s(dest, size, buffer + front, size);
 
 		front = (front + size - 1);
 		if (front >= BUFSIZE)
 			front -= BUFSIZE;
 	}
 
+	return_size += size;
 	return true;
 }
 
-bool RINGBUFFER::Peek(char *dest, int dest_size, int size, int *return_size)
+bool RINGBUFFER::Peek(char *dest, int size, int &return_size)
 {
 	int gap, temp, using_data = GetUseSize();
 
@@ -104,18 +106,16 @@ bool RINGBUFFER::Peek(char *dest, int dest_size, int size, int *return_size)
 	gap = BUFSIZE - temp;
 	if (gap < size)
 	{
-		memcpy_s(dest, dest_size, buffer + temp, gap);
-		size -= gap;	*return_size += gap;
+		memcpy_s(dest, gap, buffer + temp, gap);
+		size -= gap;	return_size += gap;
 
-		memcpy_s(dest + gap, dest_size, buffer, size);
-		*return_size += size;
+		memcpy_s(dest + gap, size, buffer, size);
+		
 	}
 	else
-	{
-		memcpy_s(dest, dest_size, buffer + temp, size);
-		*return_size += size;
-	}
+		memcpy_s(dest, size, buffer + temp, size);
 
+	return_size += size;
 	return true;
 }
 
