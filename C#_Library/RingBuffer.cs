@@ -1,10 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Net;
-using System.Net.Sockets;
 
 namespace RINGBUFFER
 {
@@ -28,29 +22,28 @@ namespace RINGBUFFER
         /*
             버퍼에 데이터를 삽입 및 삭제하는 함수
         */
-
         unsafe public bool Enqueue(IntPtr p_input_data, Int32 p_size)
         {
-            Int32 gap, unusing_data = GetUnuseSize();
+            Int32 gap, t_front = m_front, t_rear = m_rear, unusing_data = GetUnuseSize();
 
-            if ((m_rear + 1) % (Int32)Initial_Value.en_buffer_size == m_front || unusing_data < p_size)
+            if ((t_rear + 1) % (Int32)Initial_Value.en_buffer_size == t_front || unusing_data < p_size)
                 return false;
 
-            m_rear++;
-            if (m_rear == (Int32)Initial_Value.en_buffer_size)
-                m_rear = 0;
-            gap = (Int32)Initial_Value.en_buffer_size - m_rear;
+            t_rear++;
+            if (t_rear == (Int32)Initial_Value.en_buffer_size)
+                t_rear = 0;
+            gap = (Int32)Initial_Value.en_buffer_size - t_rear;
             fixed (Byte* fix_buffer = m_buffer)
             {
                 if (gap < p_size)
                 {
                     switch (gap)
                     {
-                        case 1: *(Byte*)(fix_buffer + m_rear) = *(Byte*)p_input_data; break;
-                        case 2: *(Int16*)(fix_buffer + m_rear) = *(Int16*)p_input_data; break;
-                        case 4: *(int*)(fix_buffer + m_rear) = *(int*)p_input_data; break;
-                        case 8: *(Int64*)(fix_buffer + m_rear) = *(Int64*)p_input_data; break;
-                        default: System.Runtime.InteropServices.Marshal.Copy(p_input_data, m_buffer, m_rear, gap); break;
+                        case 1: *(Byte*)(fix_buffer + t_rear)  = *(Byte*)p_input_data; break;
+                        case 2: *(Int16*)(fix_buffer + t_rear) = *(Int16*)p_input_data; break;
+                        case 4: *(Int32*)(fix_buffer + t_rear) = *(Int32*)p_input_data; break;
+                        case 8: *(Int64*)(fix_buffer + t_rear) = *(Int64*)p_input_data; break;
+                        default: System.Runtime.InteropServices.Marshal.Copy(p_input_data, m_buffer, t_rear, gap); break;
                     }
 
                     Byte* byte_store = (Byte*)(p_input_data.ToPointer());
@@ -65,14 +58,17 @@ namespace RINGBUFFER
                 {
                     switch (p_size)
                     {
-                        case 1: *(Byte*)(fix_buffer + m_rear) = *(Byte*)p_input_data; break;
-                        case 2: *(Int16*)(fix_buffer + m_rear) = *(Int16*)p_input_data; break;
-                        case 4: *(int*)(fix_buffer + m_rear) = *(int*)p_input_data; break;
-                        case 8: *(Int64*)(fix_buffer + m_rear) = *(Int64*)p_input_data; break;
-                        default: System.Runtime.InteropServices.Marshal.Copy(p_input_data, m_buffer, m_rear, p_size); break;
+                        case 1: *(Byte*)(fix_buffer + t_rear)  = *(Byte*)p_input_data; break;
+                        case 2: *(Int16*)(fix_buffer + t_rear) = *(Int16*)p_input_data; break;
+                        case 4: *(Int32*)(fix_buffer + t_rear) = *(Int32*)p_input_data; break;
+                        case 8: *(Int64*)(fix_buffer + t_rear) = *(Int64*)p_input_data; break;
+                        default: System.Runtime.InteropServices.Marshal.Copy(p_input_data, m_buffer, t_rear, p_size); break;
                     }
 
-                    m_rear += p_size - 1;
+                    if ((Int32)Initial_Value.en_buffer_size <= m_rear + p_size)
+                        m_rear += p_size - (Int32)Initial_Value.en_buffer_size;
+                    else
+                        m_rear += p_size;
                 }
             }
 
@@ -82,27 +78,27 @@ namespace RINGBUFFER
         unsafe public bool Dequeue(IntPtr p_output_data, Int32 p_size)
         {
             Byte* byte_store;
-            Int32 gap, using_data = GetUseSize();
+            Int32 gap, t_front = m_front, t_rear = m_rear, using_data = GetUseSize();
 
-            if (m_rear == m_front || using_data < p_size)
+            if (t_rear == t_front || using_data < p_size)
                 return false;
 
-            m_front++;
-            if (m_front == (Int32)Initial_Value.en_buffer_size)
-                m_front = 0;
+            t_front++;
+            if (t_front == (Int32)Initial_Value.en_buffer_size)
+                t_front = 0;
 
-            gap = (Int32)Initial_Value.en_buffer_size - m_front;
+            gap = (Int32)Initial_Value.en_buffer_size - t_front;
             fixed (Byte* fix_buffer = m_buffer)
             {
                 if (gap < p_size)
                 {
                     switch (gap)
                     {
-                        case 1: *(Byte*)p_output_data = *(Byte*)(fix_buffer + m_front); break;
-                        case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + m_front); break;
-                        case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + m_front); break;
-                        case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + m_front); break;
-                        default: System.Runtime.InteropServices.Marshal.Copy(m_buffer, m_front, p_output_data, gap); break;
+                        case 1: *(Byte*)p_output_data  = *(Byte*)(fix_buffer + t_front); break;
+                        case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + t_front); break;
+                        case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + t_front); break;
+                        case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + t_front); break;
+                        default: System.Runtime.InteropServices.Marshal.Copy(m_buffer, t_front, p_output_data, gap); break;
                     }
 
                     byte_store = (Byte*)(p_output_data.ToPointer()); byte_store += gap;
@@ -115,14 +111,17 @@ namespace RINGBUFFER
                 {
                     switch (p_size)
                     {
-                        case 1: *(Byte*)p_output_data = *(Byte*)(fix_buffer + m_front); break;
-                        case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + m_front); break;
-                        case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + m_front); break;
-                        case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + m_front); break;
-                        default: System.Runtime.InteropServices.Marshal.Copy(m_buffer, m_front, p_output_data, p_size); break;
+                        case 1: *(Byte*)p_output_data  = *(Byte*)(fix_buffer + t_front); break;
+                        case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + t_front); break;
+                        case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + t_front); break;
+                        case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + t_front); break;
+                        default: System.Runtime.InteropServices.Marshal.Copy(m_buffer, t_front, p_output_data, p_size); break;
                     }
 
-                    m_front = (m_front + p_size - 1);
+                    if ((Int32)Initial_Value.en_buffer_size <= m_front + p_size)
+                        m_front += p_size - (Int32)Initial_Value.en_buffer_size;
+                    else
+                        m_front += p_size;
                 }
             }
 
@@ -132,12 +131,12 @@ namespace RINGBUFFER
         unsafe public bool Peek(IntPtr p_output_data, Int32 p_size, ref Int32 p_return_size)
         {
             Byte* byte_store;
-            Int32 gap, temp, using_data = GetUseSize();
+            Int32 gap, temp, t_front = m_front, t_rear = m_rear, using_data = GetUseSize();
 
-            if (m_rear == m_front || using_data < p_size)
+            if (t_rear == t_front || using_data < p_size)
                 return false;
 
-            temp = m_front + 1;
+            temp = t_front + 1;
             if (temp == (Int32)Initial_Value.en_buffer_size)
                 temp = 0;
 
@@ -148,7 +147,7 @@ namespace RINGBUFFER
                 {
                     switch (gap)
                     {
-                        case 1: *(Byte*)p_output_data = *(Byte*)(fix_buffer + temp); break;
+                        case 1: *(Byte*)p_output_data  = *(Byte*)(fix_buffer + temp); break;
                         case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + temp); break;
                         case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + temp); break;
                         case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + temp); break;
@@ -164,7 +163,7 @@ namespace RINGBUFFER
                 {
                     switch (p_size)
                     {
-                        case 1: *(Byte*)p_output_data = *(Byte*)(fix_buffer + temp); break;
+                        case 1: *(Byte*)p_output_data  = *(Byte*)(fix_buffer + temp); break;
                         case 2: *(Int16*)p_output_data = *(Int16*)(fix_buffer + temp); break;
                         case 4: *(Int32*)p_output_data = *(Int32*)(fix_buffer + temp); break;
                         case 8: *(Int64*)p_output_data = *(Int64*)(fix_buffer + temp); break;
@@ -184,16 +183,24 @@ namespace RINGBUFFER
         */
         public void MoveFront(Int32 p_size)
         {
-            m_front += p_size;
-            if (m_front >= (Int32)Initial_Value.en_buffer_size)
-                m_front -= (Int32)Initial_Value.en_buffer_size;
+            Int32 t_front = m_front;
+
+            t_front += p_size;
+            if (t_front >= (Int32)Initial_Value.en_buffer_size)
+                t_front -= (Int32)Initial_Value.en_buffer_size;
+
+            m_front = t_front;
         }
 
         public void MoveRear(Int32 p_size)
         {
+            Int32 t_rear = m_rear;
+
             m_rear += p_size;
             if (m_rear >= (Int32)Initial_Value.en_buffer_size)
                 m_rear -= (Int32)Initial_Value.en_buffer_size;
+
+            m_rear = t_rear;
         }
 
 
@@ -202,18 +209,22 @@ namespace RINGBUFFER
         */
         public Int32 GetUseSize()
         {
-            if (m_front > m_rear)
-                return (Int32)Initial_Value.en_buffer_size - (m_front - m_rear);    // (BUFSIZE - 1) - (front - rear) + 1; 
+            Int32 t_front = m_front, t_rear = m_rear;
+
+            if (t_front > t_rear)
+                return (Int32)Initial_Value.en_buffer_size - (t_front - t_rear);    // (BUFSIZE - 1) - (front - rear) + 1; 
             else
-                return m_rear - m_front;
+                return t_rear - t_front;
         }
 
         public Int32 GetUnuseSize()
         {
-            if (m_front > m_rear)
-                return m_front - m_rear - 1;
+            Int32 t_front = m_front, t_rear = m_rear;
+
+            if (t_front > m_rear)
+                return t_front - t_rear - 1;
             else
-                return ((Int32)Initial_Value.en_buffer_size - 1) - (m_rear - m_front);
+                return ((Int32)Initial_Value.en_buffer_size - 1) - (t_rear - t_front);
         }
 
 
@@ -222,29 +233,33 @@ namespace RINGBUFFER
         */
         public Int32 LinearRemainFrontSize()
         {
-            if (m_front == m_rear)
+            Int32 t_front = m_front, t_rear = m_rear;
+
+            if (t_front == t_rear)
                 return 0;
             else
             {
-                Int32 front_temp = m_front + 1;
+                Int32 front_temp = t_front + 1;
                 if (front_temp == (Int32)Initial_Value.en_buffer_size) front_temp = 0;
 
-                if (front_temp > m_rear)
+                if (front_temp > t_rear)
                     return (Int32)Initial_Value.en_buffer_size - front_temp;
                 else
-                    return m_rear - front_temp + 1;
+                    return t_rear - front_temp + 1;
             }
         }
 
         public Int32 LinearRemainRearSize()
         {
-            Int32 rear_temp = m_rear + 1;
+            Int32 t_front = m_front, t_rear = m_rear;
+
+            Int32 rear_temp = t_rear + 1;
             if (rear_temp == (Int32)Initial_Value.en_buffer_size) rear_temp = 0;
 
-            if (rear_temp >= m_front)
+            if (rear_temp >= t_front)
                 return (Int32)Initial_Value.en_buffer_size - rear_temp;
             else
-                return m_front - rear_temp;
+                return t_front - rear_temp;
         }
 
 
@@ -254,7 +269,7 @@ namespace RINGBUFFER
         unsafe public IntPtr GetBasicPtr()
         {
             fixed (Byte* fix_buffer = m_buffer)
-                return (IntPtr)fix_buffer;    
+                return (IntPtr)fix_buffer;
         }
 
         unsafe public IntPtr GetFrontPtr()
