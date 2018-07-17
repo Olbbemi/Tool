@@ -13,29 +13,26 @@
 
 using namespace std;
 
-class RINGBUFFER;
-
 class HTTP_REQUEST
 {
 private:
 
 	BYTE m_major_version, m_minor_version; // 추후에 DB에서 가져오는거???
-
 	TCHAR m_ip[IP_ADDRESS_LEN];
 	WSADATA m_wsadata;
 
 	SOCKET m_http_socket;
 	SOCKADDR_IN m_sockaddr;
 	
-	RINGBUFFER *m_sendQ, *m_recvQ;
-
-	string m_http_header;
+	string m_send_http, m_recv_http;
 
 public:
 	HTTP_REQUEST(bool &p_flag);
 	~HTTP_REQUEST();
 
-	void MakePacket(string p_path);
+	void AssemblePacket(string p_path);
+	void DisassemblePacket();
+
 	bool SendPost();
 	bool RecvPost();
 	void Disconnect();
