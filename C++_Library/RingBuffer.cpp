@@ -1,18 +1,21 @@
 #include "Precompile.h"
 #include "RingBuffer.h"
 
-#include <string.h>
+#include <stdlib.h>
+
 #define BUFSIZE 10000
+
+using namespace Olbbemi;
 
 RINGBUFFER::RINGBUFFER()
 {
-	m_buffer = new char[BUFSIZE];
+	m_buffer = (char*)malloc(BUFSIZE);
 	m_front = m_rear = 0;
 }
 
 RINGBUFFER::~RINGBUFFER()
 {
-	delete[] m_buffer;
+	free(m_buffer);
 }
 
 int RINGBUFFER::GetUseSize()
@@ -265,12 +268,12 @@ int RINGBUFFER::LinearRemainRearSize()
 		return t_front - rear_temp;
 }
 
-void RINGBUFFER::Lock()
+void RINGBUFFER::RingBuffer_Lock()
 {
 	AcquireSRWLockExclusive(&m_srw);
 }
 
-void RINGBUFFER::Unlock()
+void RINGBUFFER::RingBuffer_Unlock()
 {
 	ReleaseSRWLockExclusive(&m_srw);
 }

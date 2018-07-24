@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-namespace Olbbemi 
+namespace Olbbemi
 {
 	class RINGBUFFER
 	{
@@ -33,8 +33,8 @@ namespace Olbbemi
 		int LinearRemainFrontSize();
 		int LinearRemainRearSize();
 
-		void Lock();
-		void Unlock();
+		void RingBuffer_Lock();
+		void RingBuffer_Unlock();
 	};
 }
 

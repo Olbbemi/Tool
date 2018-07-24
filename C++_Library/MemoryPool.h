@@ -2,8 +2,15 @@
 #define  MemoryPool_Info
 #define CHECK_SUM 0x41
 
+#define UNICODE
+#define _UNICODE
+
+#include "Log.h"
+
 #include <new.h>
+#include <tchar.h>
 #include <stdlib.h>
+#include <typeinfo>
 #include <Windows.h>
 
 /*
@@ -31,7 +38,7 @@ namespace Olbbemi
 			}
 		};
 		
-		WORD m_use_count, m_alloc_count;
+		WORD m_use_count, m_alloc_count, m_wrong_free;
 		NODE* m_pool_top;
 		SRWLOCK m_pool_srw_lock;
 		
@@ -45,6 +52,7 @@ namespace Olbbemi
 
 			m_max_count = p_block_max_count;	m_is_placementnew = p_is_placement_new;
 			m_use_count = 0;					m_alloc_count = 1;
+			m_wrong_free = 0;
 
 			m_pool_top = (NODE*)malloc(sizeof(NODE));
 			if (p_is_placement_new == false)
@@ -60,9 +68,9 @@ namespace Olbbemi
 				if (m_is_placementnew == false)
 					garbage->s_data.~DATA();
 
-				free(garbage);
-
+				m_alloc_count--;
 				m_pool_top = m_pool_top->s_next_block;
+				free(garbage);
 			}
 		}
 
@@ -101,7 +109,16 @@ namespace Olbbemi
 			}
 			else
 			{
-				// log || dump
+				TCHAR buffer[100], object[50], param[50];
+				ZeroMemory(buffer, 100);  ZeroMemory(object, 50);	ZeroMemory(param, 50);
+
+				MultiByteToWideChar(CP_UTF8, 0, typeid(DATA).name(), strlen(typeid(DATA).name()), object, 50);
+				MultiByteToWideChar(CP_UTF8, 0, typeid(pData).name(), strlen(typeid(pData).name()), param, 50);
+	
+				_stprintf_s(buffer, 100, _TEXT("MemoryPool Type: [%s], Free_Value Type: [%s]"), object, param);
+				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, 1, buffer);
+
+				m_wrong_free++;
 				return false;
 			}
 		}
@@ -118,12 +135,12 @@ namespace Olbbemi
 			return m_use_count;
 		}
 
-		void Lock()
+		void Pool_Lock()
 		{
 			AcquireSRWLockExclusive(&m_pool_srw_lock);
 		}
 
-		void Unlock()
+		void Pool_Unlock()
 		{
 			ReleaseSRWLockExclusive(&m_pool_srw_lock);
 		}

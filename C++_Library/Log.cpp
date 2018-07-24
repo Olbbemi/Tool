@@ -1,13 +1,10 @@
 #include "Precompile.h"
 #include "Log.h"
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
 
 BYTE LOG::m_log_level = LOG_LEVEL_ERROR;
-
-
 
 void LOG::PrintLog(int p_line, BYTE p_log_level, int p_fix_data, ...)
 {
