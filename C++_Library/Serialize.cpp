@@ -5,15 +5,9 @@
 #include <algorithm>
 using namespace std;
 
-SERIALIZE::SERIALIZE(int p_header_size, int p_size) : m_front(0), m_rear(0)
+SERIALIZE::SERIALIZE(int p_header_size) : m_front(0), m_rear(0)
 {
 	m_front = m_rear = p_header_size;
-	m_buffer_ptr = new char[p_size];
-}
-
-SERIALIZE::~SERIALIZE()
-{
-	delete[] m_buffer_ptr;
 }
 
 int SERIALIZE::GetUsingSize()
@@ -34,9 +28,6 @@ void SERIALIZE::MakeHeader(const char *p_src, const int p_size)
 
 void SERIALIZE::Enqueue(char *p_src, const int p_size)
 {
-	/*if (GetUnusingData() < p_size)
-		resize(p_size);*/
-
 	switch (p_size)
 	{
 		case 1:		*(reinterpret_cast<char*>(m_buffer_ptr + m_rear)) = *(reinterpret_cast<char*>(p_src));					break;
