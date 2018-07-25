@@ -1,21 +1,24 @@
 #include "Precompile.h"
 #include "RingBuffer.h"
 
-#include <string.h>
+#include <stdlib.h>
+
 #define BUFSIZE 10000
+
+using namespace Olbbemi;
 
 RINGBUFFER::RINGBUFFER()
 {
-	m_buffer = new char[BUFSIZE];
+	m_buffer = (char*)malloc(BUFSIZE);
 	m_front = m_rear = 0;
 }
 
 RINGBUFFER::~RINGBUFFER()
 {
-	delete[] m_buffer;
+	free(m_buffer);
 }
 
-int RINGBUFFER::GetUseSize()
+int RINGBUFFER::GetUseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -25,7 +28,7 @@ int RINGBUFFER::GetUseSize()
 		return t_rear - t_front;
 }
 
-int RINGBUFFER::GetUnuseSize()
+int RINGBUFFER::GetUnuseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -191,12 +194,12 @@ bool RINGBUFFER::Peek(char *p_dest, const int p_size, int &p_return_size)
 	return true;
 }
 
-char* RINGBUFFER::GetBasicPtr()
+char* RINGBUFFER::GetBasicPtr() const
 {
 	return m_buffer;
 }
 
-char* RINGBUFFER::GetFrontPtr()
+char* RINGBUFFER::GetFrontPtr() const
 {
 	int front_temp = m_front + 1;
 	if (front_temp == BUFSIZE)
@@ -205,7 +208,7 @@ char* RINGBUFFER::GetFrontPtr()
 	return m_buffer + front_temp;
 }
 
-char* RINGBUFFER::GetRearPtr()
+char* RINGBUFFER::GetRearPtr() const
 {
 	int rear_temp = m_rear + 1;
 	if (rear_temp == BUFSIZE)
@@ -265,12 +268,12 @@ int RINGBUFFER::LinearRemainRearSize()
 		return t_front - rear_temp;
 }
 
-void RINGBUFFER::Lock()
+void RINGBUFFER::RingBuffer_Lock()
 {
 	AcquireSRWLockExclusive(&m_srw);
 }
 
-void RINGBUFFER::Unlock()
+void RINGBUFFER::RingBuffer_Unlock()
 {
 	ReleaseSRWLockExclusive(&m_srw);
 }

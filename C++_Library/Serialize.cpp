@@ -1,23 +1,48 @@
 #include "Precompile.h"
 #include "Serialize.h"
 
-#include <cstring>
-#include <algorithm>
-using namespace std;
+#include <stdlib.h>
+#include <string.h>
+using namespace Olbbemi;
 
-SERIALIZE::SERIALIZE(int p_header_size) : m_front(0), m_rear(0)
+SERIALIZE::SERIALIZE()
 {
-	m_front = m_rear = p_header_size;
+	m_front = m_rear = 0;
+	m_total_length = SERIALIZE_BUFFER_SIZE;
+	m_buffer_ptr = (char*)malloc(SERIALIZE_BUFFER_SIZE);
 }
 
-int SERIALIZE::GetUsingSize()
+SERIALIZE::~SERIALIZE()
+{
+	free(m_buffer_ptr);
+}
+
+void SERIALIZE::Resize(int p_remain_size, int p_input_size)
+{
+	while (p_remain_size + m_total_length <= p_input_size)
+		m_total_length += SERIALIZE_BUFFER_SIZE;
+
+	char* temp_buffer = (char*)malloc(m_total_length);
+	memcpy_s(temp_buffer, m_total_length, m_buffer_ptr, m_total_length);
+
+	free(m_buffer_ptr);
+	m_buffer_ptr = temp_buffer;
+}
+
+int SERIALIZE::GetUsingSize() const
 {
 	return m_rear - m_front;
 }
 
-int SERIALIZE::GetUnusingSize()
+int SERIALIZE::GetUnusingSize() const
 {
 	return SERIALIZE_BUFFER_SIZE - m_rear - 1;
+}
+
+void SERIALIZE::InputHeaderSize(int p_header_size)
+{
+	m_front = m_rear = p_header_size;
+	m_total_length = SERIALIZE_BUFFER_SIZE;
 }
 
 void SERIALIZE::MakeHeader(const char *p_src, const int p_size)
@@ -28,6 +53,11 @@ void SERIALIZE::MakeHeader(const char *p_src, const int p_size)
 
 void SERIALIZE::Enqueue(char *p_src, const int p_size)
 {
+	int remain_size = GetUnusingSize();
+
+	if (remain_size < p_size)
+		Resize(remain_size, p_size);
+
 	switch (p_size)
 	{
 		case 1:		*(reinterpret_cast<char*>(m_buffer_ptr + m_rear)) = *(reinterpret_cast<char*>(p_src));					break;
@@ -67,7 +97,7 @@ void SERIALIZE::MoveRear(const int p_size)
 	m_rear += p_size;
 }
 
-char* SERIALIZE::GetBufferPtr()
+char* SERIALIZE::GetBufferPtr() const
 {
 	return m_buffer_ptr + m_front;
 }

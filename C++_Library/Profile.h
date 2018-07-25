@@ -11,7 +11,10 @@
 	#define END(None)
 #endif
 
-namespace Olbbemi 
+#include <list>
+using namespace std;
+
+namespace Olbbemi
 {
 	class PROFILE
 	{
@@ -55,5 +58,6 @@ namespace Olbbemi
 		friend void Profile_End(PROFILE *p_obj, const PTCHAR p_str);
 	};
 }
+
 
 #endif

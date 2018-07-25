@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-namespace Olbbemi 
+namespace Olbbemi
 {
 	class RINGBUFFER
 	{
@@ -20,12 +20,12 @@ namespace Olbbemi
 		bool Dequeue(char *p_dest, const int p_size);
 		bool Peek(char *p_dest, const int p_size, int &p_return_size);
 
-		int GetUseSize();
-		int GetUnuseSize();
+		int GetUseSize() const;
+		int GetUnuseSize() const;
 
-		char* GetBasicPtr();
-		char* GetFrontPtr();
-		char* GetRearPtr();
+		char* GetBasicPtr() const;
+		char* GetFrontPtr() const;
+		char* GetRearPtr() const;
 
 		void MoveFront(const int p_size);
 		void MoveRear(const int p_size);
@@ -33,8 +33,8 @@ namespace Olbbemi
 		int LinearRemainFrontSize();
 		int LinearRemainRearSize();
 
-		void Lock();
-		void Unlock();
+		void RingBuffer_Lock();
+		void RingBuffer_Unlock();
 	};
 }
 

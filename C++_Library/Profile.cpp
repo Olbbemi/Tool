@@ -1,12 +1,19 @@
 #include "Precompile.h"
 #include "Profile.h"
 
+
+#include <time.h>
+#include <stdlib.h>
+#include <strsafe.h>
+
+using namespace Olbbemi;
+
 PROFILE::NODE::NODE(const PTCHAR p_str, _int64 p_time)
 {
 	m_min_count = m_max_count = 0;
 	m_call_count = m_total_time = 0;
 	m_start_time = p_time;
-	_tcscpy_s(m_function_name, _countof(m_function_name), p_str);
+	StringCchCat(m_function_name, _countof(m_function_name), p_str);
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -28,12 +35,12 @@ void PROFILE::GetTime()
 	struct tm data;
 	localtime_s(&data, &timer);
 
-	_stprintf_s(date, _TEXT("%4d_%02d%02d_%02d%02d%02d"), data.tm_year + 1900, data.tm_mon + 1, data.tm_mday, data.tm_hour, data.tm_min, data.tm_sec);
-	_tcscat_s(m_file, _countof(m_file), date);
-	_tcscat_s(m_file, _countof(m_file), tail);
+	StringCchPrintf(date, 20, _TEXT("%4d_%02d%02d_%02d%02d%02d"), data.tm_year + 1900, data.tm_mon + 1, data.tm_mday, data.tm_hour, data.tm_min, data.tm_sec);
+	StringCchCat(m_file, _countof(m_file), date);
+	StringCchCat(m_file, _countof(m_file), tail);
 }
 
-void Profile_Begin(PROFILE *p_obj, const PTCHAR p_str, int p_line)
+void Olbbemi::Profile_Begin(PROFILE *p_obj, const PTCHAR p_str, int p_line)
 {
 	int flag = (unsigned int)PROFILE::STATUS::e_Normal;
 	for (auto p = p_obj->node_list.begin(); p != p_obj->node_list.end(); p++)
@@ -66,7 +73,7 @@ void Profile_Begin(PROFILE *p_obj, const PTCHAR p_str, int p_line)
 	}
 }
 
-void Profile_End(PROFILE *p_obj, const PTCHAR p_str)
+void Olbbemi::Profile_End(PROFILE *p_obj, const PTCHAR p_str)
 {
 	QueryPerformanceCounter(&p_obj->end_count);
 	for (auto p = p_obj->node_list.begin(); p != p_obj->node_list.end(); p++)
@@ -126,12 +133,14 @@ void PROFILE::Save()
 
 	if (GetAsyncKeyState('L') & 0x0001)
 	{
-		if (m_is_lock == true)
-			_tprintf(_TEXT("-----U N L O C K-----\n"));
-		else
-			_tprintf(_TEXT("-----L O C K-----\n"));
+		m_is_lock = true;
+		_tprintf(_TEXT("-----L O C K-----\n"));
+	}
 
-		m_is_lock = !m_is_lock;
+	if (GetAsyncKeyState('U') & 0x0001)
+	{
+		m_is_lock = false;
+		_tprintf(_TEXT("-----U N L O C K-----\n"));
 	}
 
 	if (m_is_lock == false && (GetAsyncKeyState(VK_HOME) & 0x0001))
