@@ -4,6 +4,7 @@
 #define UNICODE
 #define _UNICODE
 #define CHECK_SUM 0x41
+#define INITIAL_HEAP_SIZE 1024 * 1024
 
 #include "Log.h"
 
@@ -20,6 +21,7 @@
 using namespace std;
 
 /*
+ * 메모리 풀은 기본 힙을 사용하지 않음 ( HeapCreate, HeapAlloc, HeapFree, HeapDestroy 이용 )
  * placement new : new 연산자에서 제공하는 3가지 성질 [ 1.동적할당, 2.객체에 대하여 생성자 호출, 3.가상테이블 생성 ] 중 2, 3번을 수행하는 연산자
  * MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 false : NODE 생성 시 최초에 한번만 생성자호출 및 소멸자 호출 [ malloc 으로 할당하고 placement_new 호출, 소멸자 직접 호출 ]
  * MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 true :  NODE 생성 시에는 malloc으로 할당, 외부에서 Alloc 및 Free 함수를 호출할 때마다 placement_new 이용하여 생성자 및 소멸자 호출 ]
@@ -47,7 +49,8 @@ namespace Olbbemi
 		WORD m_use_count, m_alloc_count, m_wrong_free;
 		NODE* m_pool_top;
 		SRWLOCK m_pool_srw_lock;
-		
+		HANDLE m_heap_handle;
+
 		bool m_is_placementnew;
 		int m_max_count;
 
@@ -55,19 +58,42 @@ namespace Olbbemi
 		MemoryPool(int p_block_max_count, bool p_is_placement_new = false)
 		{
 			InitializeSRWLock(&m_pool_srw_lock);
+			
+			/*
+			 * Alloc 및 Free 함수에 SRWLock 사용하므로 Heap 내부의 Lock 불필요
+			 * 마지막인자 값이 0: 초기 설정한 메모리 크기를 초과할 시 자동으로 증가
+			 */
+			m_heap_handle = HeapCreate(HEAP_NO_SERIALIZE, INITIAL_HEAP_SIZE, 0); if (m_heap_handle == NULL)
+			{
+				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
+				initializer_list<string> str = { "Heap Create Error Code: " + to_string(GetLastError()) };
+				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+				throw;
+			}
 
 			m_max_count = p_block_max_count;	m_is_placementnew = p_is_placement_new;
 			m_use_count = 0;					m_alloc_count = 1;
 			m_wrong_free = 0;
 
-			m_pool_top = (NODE*)malloc(sizeof(NODE));
+			m_pool_top = (NODE*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(NODE));
+			if (m_pool_top == NULL)
+			{
+				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
+				initializer_list<string> str = { "Heap Alloc Error Code: " + to_string(GetLastError()) };
+				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+				throw;
+			}
+
 			if (p_is_placement_new == false)
 				new(m_pool_top) NODE();
 		}
 
 		virtual	~MemoryPool()
 		{
+			bool destroy_check;
+			int free_check;
 			NODE* garbage;
+
 			while (m_pool_top != nullptr)
 			{
 				garbage = m_pool_top;
@@ -76,7 +102,24 @@ namespace Olbbemi
 
 				m_alloc_count--;
 				m_pool_top = m_pool_top->s_next_block;
-				free(garbage);
+				free_check = HeapFree(m_heap_handle, 0, garbage);
+
+				if (free_check == 0)
+				{
+					TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
+					initializer_list<string> str = { "Heap Free Error Code: " + to_string(GetLastError()) };
+					LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+					throw;
+				}
+			}
+
+			destroy_check = HeapDestroy(m_heap_handle);
+			if (destroy_check == false)
+			{
+				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
+				initializer_list<string> str = { "Heap Destroy Error Code: " + to_string(GetLastError()) };
+				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+				throw;
 			}
 		}
 
@@ -86,7 +129,7 @@ namespace Olbbemi
 
 			if (m_pool_top->s_next_block == nullptr)
 			{
-				NODE *new_node = (NODE*)malloc(sizeof(NODE));
+				NODE *new_node = (NODE*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(NODE));
 				if (m_is_placementnew == false)
 					new(new_node) NODE();
 
@@ -105,7 +148,7 @@ namespace Olbbemi
 			return return_value;
 		}
 
-		bool Free(DATA* pData, TCHAR* p_server)
+		bool Free(DATA* pData)
 		{
 			AcquireSRWLockExclusive(&m_pool_srw_lock);
 
@@ -120,11 +163,11 @@ namespace Olbbemi
 			}
 			else
 			{
-				TCHAR action[] = _TEXT("MemoryPool");
+				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
 				string object = typeid(DATA).name(), param = typeid(pData).name();
 
 				initializer_list<string> str = { "PoolAlloc Type: [" + object + "], Free_Value Type: [" + param + "]" };
-				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, p_server, str);
+				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
 
 				m_wrong_free++;
 				return false;

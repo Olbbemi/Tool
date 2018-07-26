@@ -1,4 +1,5 @@
 #include "Precompile.h"
+#include "Log.h"
 #include "Serialize.h"
 
 #include <stdlib.h>
@@ -9,7 +10,16 @@ SERIALIZE::SERIALIZE()
 {
 	m_front = m_rear = 0;
 	m_total_length = SERIALIZE_BUFFER_SIZE;
+
 	m_buffer_ptr = (char*)malloc(SERIALIZE_BUFFER_SIZE);
+	if (m_buffer_ptr == nullptr)
+	{
+		TCHAR action[] = _TEXT("SERIALIZE"), server[] = _TEXT("NONE");
+		initializer_list<string> str = { "Seiralize malloc Fail" };
+
+		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+		throw;
+	}
 }
 
 SERIALIZE::~SERIALIZE()
@@ -23,6 +33,15 @@ void SERIALIZE::Resize(int p_remain_size, int p_input_size)
 		m_total_length += SERIALIZE_BUFFER_SIZE;
 
 	char* temp_buffer = (char*)malloc(m_total_length);
+	if (temp_buffer == nullptr)
+	{
+		TCHAR action[] = _TEXT("SERIALIZE"), server[] = _TEXT("NONE");
+		initializer_list<string> str = { "Seiralize Resize malloc Fail" };
+
+		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+		throw;
+	}
+
 	memcpy_s(temp_buffer, m_total_length, m_buffer_ptr, m_total_length);
 
 	free(m_buffer_ptr);

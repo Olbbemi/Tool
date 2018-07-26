@@ -1,7 +1,10 @@
 #include "Precompile.h"
+#include "Log.h"
 #include "RingBuffer.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <exception>
 
 #define BUFSIZE 10000
 
@@ -10,6 +13,15 @@ using namespace Olbbemi;
 RINGBUFFER::RINGBUFFER()
 {
 	m_buffer = (char*)malloc(BUFSIZE);
+	if (m_buffer == nullptr)
+	{
+		TCHAR action[] = _TEXT("RINGBUFFER"), server[] = _TEXT("NONE");
+		initializer_list<string> str = { "Ringbuffer malloc Fail" };
+
+		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
+		throw;
+	}
+
 	m_front = m_rear = 0;
 }
 

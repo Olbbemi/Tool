@@ -1,7 +1,6 @@
 #include "Precompile.h"
 #include "Profile.h"
 
-
 #include <time.h>
 #include <stdlib.h>
 #include <strsafe.h>
@@ -13,7 +12,7 @@ PROFILE::NODE::NODE(const PTCHAR p_str, _int64 p_time)
 	m_min_count = m_max_count = 0;
 	m_call_count = m_total_time = 0;
 	m_start_time = p_time;
-	StringCchCat(m_function_name, _countof(m_function_name), p_str);
+	StringCchCopy(m_function_name, _countof(m_function_name), p_str);
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -22,7 +21,7 @@ PROFILE::NODE::NODE(const PTCHAR p_str, _int64 p_time)
 	}
 }
 
-PROFILE::PROFILE() : m_file(_TEXT("Profile_")), m_is_lock(true)
+PROFILE::PROFILE() : m_is_lock(true), m_file(_TEXT("Profile_"))
 {
 	QueryPerformanceFrequency(&m_frequency);
 }
@@ -148,8 +147,8 @@ void PROFILE::Save()
 		PROFILE::GetTime();
 
 		_tfopen_s(&output, m_file, _TEXT("w, ccs=UTF-16LE"));
-		_ftprintf_s(output, _TEXT(" ----------------------------------------------------------------------------------------------------\n"));
-		_ftprintf_s(output, _TEXT("|     FileName     |       Average       |      Min_Value      |      Max_Value      |     Count     |\n"));
+		_ftprintf_s(output, _TEXT("  -----------------------------------------------------------------------------------------------------------------------\n"));
+		_ftprintf_s(output, _TEXT("#            Name            #       Average       #       Min_Value       #       Max_Value       #       Count       #\n"));
 
 		for (auto p = node_list.begin(); p != node_list.end(); p++)
 		{
@@ -179,10 +178,10 @@ void PROFILE::Save()
 			}
 			(*p)->m_call_count -= ((*p)->m_min_count - 1);
 
-			_ftprintf_s(output, _TEXT("|%18s|%21.4Lf|%21.4Lf|%21.4Lf|%15lld|\n"), (*p)->m_function_name, ((long double)(*p)->m_total_time / (long double)(*p)->m_call_count / (long double)m_frequency.QuadPart * MICRO), ((long double)MinValue / (long double)m_frequency.QuadPart * MICRO), ((long double)MaxValue / (long double)m_frequency.QuadPart * MICRO), (*p)->m_call_count);
+			_ftprintf_s(output, _TEXT("#%30s#%22.4Lf#%24.4Lf#%24.4Lf#%18lld#\n"), (*p)->m_function_name, ((long double)(*p)->m_total_time / (long double)(*p)->m_call_count / (long double)m_frequency.QuadPart * MICRO), ((long double)MinValue / (long double)m_frequency.QuadPart * MICRO), ((long double)MaxValue / (long double)m_frequency.QuadPart * MICRO), (*p)->m_call_count);
 		}
 
-		_ftprintf_s(output, _TEXT(" ----------------------------------------------------------------------------------------------------\n"));
+		_ftprintf_s(output, _TEXT("  -----------------------------------------------------------------------------------------------------------------------\n"));
 		fclose(output);
 
 		m_file[0] = '\0';

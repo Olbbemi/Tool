@@ -11,7 +11,7 @@
 	#define END(None)
 #endif
 
-#include <list>
+#include <vector>
 using namespace std;
 
 namespace Olbbemi
@@ -45,7 +45,7 @@ namespace Olbbemi
 		TCHAR m_file[30];
 		LARGE_INTEGER m_frequency, begin_count, end_count;
 
-		list<NODE*> node_list;
+		vector<NODE*> node_list;
 
 		void GetTime();
 

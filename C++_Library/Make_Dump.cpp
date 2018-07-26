@@ -91,9 +91,9 @@ LONG WINAPI CrashDump::PrintException(__in PEXCEPTION_POINTERS pExceptionPointer
 	}
 	else
 	{
-		TCHAR type[] = _TEXT("");
+		TCHAR action[] = _TEXT("DUMP"), server[] = _TEXT("NONE");
 		initializer_list<string> str = { "Createfile Error Code:" + GetLastError() };
-		//_LOG(__LINE__, LOG_LEVEL_ERROR, type, str);
+		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
 	}
 
 	return EXCEPTION_EXECUTE_HANDLER;

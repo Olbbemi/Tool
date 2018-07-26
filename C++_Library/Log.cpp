@@ -26,7 +26,7 @@ void LOG::MakeDirectory(const char* p_path)
 		{
 			TCHAR type[] = _TEXT("LOG"), server[] = _TEXT("NONE");
 			initializer_list<string> str = { "CreateDirectory Error Code: " + to_string(error) };
-			PrintLog(__LINE__, LOG_LEVEL_ERROR, type, server, str);
+			PrintLog(__LINE__, LOG_LEVEL_SYSTEM, type, server, str);
 		}
 	}
 }
@@ -103,7 +103,7 @@ void LOG::BinaryLog(int p_line, TCHAR* p_action, TCHAR* p_server, char* p_str, i
 
 	fprintf(input, "Binary : [");
 	for (int i = 0; i < p_size; i++)
-		fprintf(input, "%#x ", p_str[i]);
+		fprintf(input, "%#x|", p_str[i]);
 	fprintf(input, "]\n");
 
 	fclose(input);
