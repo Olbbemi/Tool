@@ -14,11 +14,25 @@
 using namespace std;
 
 /*
- * 1. 실행에서 메인이될 cpp 파일의 전역으로 Log 객체 생성 ( SRWLock 초기화 목적 )
- * 2. 각 실행파일이 실행될 때 남겨질 로그가 저장될 폴더를 _MAKEDIR 매크로를 이용하여 생성
- * 3. 로그남길 경우 _LOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류 ] 
- * 4. 바이너리 로그를 남길 경우 _BinaryLOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류, Size: 바이너리 크기 ]
-*/
+ *  1. 실행에서 메인이될 cpp 파일의 전역으로 Log 객체 생성 ( SRWLock 초기화 목적 )
+ *  2. 각 실행파일이 실행될 때 남겨질 로그가 저장될 폴더를 _MAKEDIR 매크로를 이용하여 생성
+ *  3. 로그남길 경우 _LOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류 ] 
+ *  4. 로그를 남겨야하는 파일에서는 아래와 같은 구조체를 정의하여 로그 함수 호출
+ *  ------------------------------------------------------- 
+ *  ST_Log
+ *  {
+ *	 	int count;
+ * 		string log_str[size];
+ *
+ *      ST_Log(initializer_list<string> pa_log) : count(0)
+ *	    {
+ *			for(auto p : pa_log)
+ *				log_str[count++] = p;
+ *      }
+ *  }
+ *  -------------------------------------------------------
+ *  5. 바이너리 로그를 남길 경우 _BinaryLOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류, Size: 바이너리 크기 ]
+ */
 
 class C_Log
 {
@@ -32,23 +46,23 @@ public:
 	
 	C_Log();
 	static DWORD S_MakeDirectory(const char* pa_path);
-	static void S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* pa_server, initializer_list<string> pa_error_str);
+	static void S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* pa_server, WORD pa_str_count, string pa_error_str[]);
 	static void S_BinaryLog(int pa_line, TCHAR* pa_action, TCHAR* pa_server, char* pa_str, int pa_size);
 };
 
-#define _MAKEDIR(pa_path)	C_Log::MakeDirectory(pa_path);
+#define _MAKEDIR(pa_path)	C_Log::S_MakeDirectory(pa_path);
 
-#define _LOG(pa_line, pa_log_level, pa_action, pa_server, pa_error_str)						\
-	do																						\
-	{																						\
-			if(pa_log_level <= C_Log::m_log_level)											\
-				C_Log::S_PrintLog(pa_line, pa_log_level, pa_action, pa_server, pa_error_str);	\
-	}while (0)																				\
+#define _LOG(pa_line, pa_log_level, pa_action, pa_server, pa_str_count, pa_error_str)						\
+	do																										\
+	{																										\
+			if(pa_log_level <= C_Log::m_log_level)															\
+				C_Log::S_PrintLog(pa_line, pa_log_level, pa_action, pa_server, pa_str_count, pa_error_str);	\
+	}while (0)																								\
 
-#define _BinaryLOG(pa_line, pa_action, pa_server, pa_error_str, pa_size)		\
-	do																			\
-	{																			\
+#define _BinaryLOG(pa_line, pa_action, pa_server, pa_error_str, pa_size)			\
+	do																				\
+	{																				\
 		C_Log::S_BinaryLog(pa_line, pa_action, pa_server, pa_error_str, pa_size);	\
-	}while (0)																	\
+	}while (0)																		\
 
 #endif

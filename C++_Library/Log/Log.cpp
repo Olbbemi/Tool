@@ -6,7 +6,7 @@
 #include <direct.h>	
 #include <strsafe.h>
 
-BYTE C_Log::m_log_level = LOG_LEVEL_SYSTEM;
+BYTE C_Log::m_log_level = LOG_LEVEL_DEBUG;
 TCHAR C_Log::m_dir_path[50];
 SRWLOCK C_Log::m_log_srwLock; SRWLOCK C_Log::m_binary_log_srwLock;
 
@@ -33,7 +33,7 @@ DWORD C_Log::S_MakeDirectory(const char* pa_path)
 	return 0;
 }
 
-void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* pa_server, initializer_list<string> pa_error_str)
+void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* pa_server, WORD pa_str_count, string pa_error_str[])
 {
 	AcquireSRWLockExclusive(&m_log_srwLock);
 
@@ -76,9 +76,9 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_server, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
 	_ftprintf(input, _TEXT("%s\n"), output_buffer);
 
-	for (auto iter : pa_error_str)
-		fprintf(input, "%s\n", iter.c_str());
-
+	for (int i = 0; i < pa_str_count; i++)
+		fprintf(input, "%s\n", pa_error_str[i]);
+	
 	fclose(input);
 	ReleaseSRWLockExclusive(&m_log_srwLock);
 }
