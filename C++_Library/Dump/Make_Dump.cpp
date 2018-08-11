@@ -92,8 +92,8 @@ LONG WINAPI C_Dump::S_PrintException(__in PEXCEPTION_POINTERS pa_ExceptionPointe
 	else
 	{
 		TCHAR lo_action[] = _TEXT("DUMP"), lo_server[] = _TEXT("NONE");
-		initializer_list<string> lo_error_str = { "Createfile Error Code:" + GetLastError() };
-		_LOG(__LINE__, LOG_LEVEL_ERROR, lo_action, lo_server, lo_error_str);
+		ST_Log lo_log({ "Createfile Error Code:" + GetLastError() });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
 
 	return EXCEPTION_EXECUTE_HANDLER;

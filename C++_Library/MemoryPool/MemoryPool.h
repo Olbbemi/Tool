@@ -6,19 +6,13 @@
 #define CHECK_SUM 0x41
 #define INITIAL_HEAP_SIZE 1024 * 1024
 
-#include "Log.h"
+#include "Log/Log.h"
 
 #include <new.h>
 #include <tchar.h>
 #include <stdlib.h>
 #include <Windows.h>
 #include <strsafe.h>
-
-#include <string>
-#include <typeinfo>
-#include <initializer_list>
-
-using namespace std;
 
 /*
  * 메모리 풀은 기본 힙을 사용하지 않음 ( HeapCreate, HeapAlloc, HeapFree, HeapDestroy 이용 )
@@ -29,151 +23,159 @@ using namespace std;
 
 namespace Olbbemi
 {
-	template <class DATA>
-	class MemoryPool
+	template <class T>
+	class C_MemoryPool
 	{
 	private:
-		struct NODE
+		struct ST_Node
 		{
-			NODE* s_next_block;
-			DATA s_data;
-			BYTE s_checksum;
+			ST_Node* next_node;
+			T instance;
+			BYTE checksum;
 
-			NODE()
+			ST_Node()
 			{
-				s_next_block = nullptr;
-				s_checksum = CHECK_SUM;
+				next_node = nullptr;
+				checksum = CHECK_SUM;
 			}
 		};
 		
-		WORD m_use_count, m_alloc_count, m_wrong_free;
-		NODE* m_pool_top;
-		SRWLOCK m_pool_srw_lock;
+		struct ST_Top
+		{
+			volatile __int64 block_info[2];
+		};
+
+		LONG m_use_count, m_alloc_count;
 		HANDLE m_heap_handle;
+		__declspec(align(16)) ST_Top m_pool_top;
 
 		bool m_is_placementnew;
-		int m_max_count;
+		__int64 m_unique_index;
 
-	public:
-		MemoryPool(int p_block_max_count, bool p_is_placement_new = false)
+		void M_Push(ST_Node* pa_new_node)
 		{
-			InitializeSRWLock(&m_pool_srw_lock);
-			
-			/*
-			 * Alloc 및 Free 함수에 SRWLock 사용하므로 Heap 내부의 Lock 불필요
-			 * 마지막인자 값이 0: 초기 설정한 메모리 크기를 초과할 시 자동으로 증가
-			 */
-			m_heap_handle = HeapCreate(HEAP_NO_SERIALIZE, INITIAL_HEAP_SIZE, 0); if (m_heap_handle == NULL)
+			__int64 lo_top;
+
+			do
 			{
-				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
-				initializer_list<string> str = { "Heap Create Error Code: " + to_string(GetLastError()) };
-				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-				throw;
-			}
-
-			m_max_count = p_block_max_count;	m_is_placementnew = p_is_placement_new;
-			m_use_count = 0;					m_alloc_count = 1;
-			m_wrong_free = 0;
-
-			m_pool_top = (NODE*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(NODE));
-			if (m_pool_top == NULL)
-			{
-				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
-				initializer_list<string> str = { "Heap Alloc Error Code: " + to_string(GetLastError()) };
-				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-				throw;
-			}
-
-			if (p_is_placement_new == false)
-				new(m_pool_top) NODE();
+				lo_top = m_pool_top.block_info[0];
+				pa_new_node->next_node = (ST_Node*)lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_pool_top.block_info[0], (LONG64)pa_new_node, lo_top) != lo_top);
 		}
 
-		virtual	~MemoryPool()
+		T* M_Pop()
 		{
-			bool destroy_check;
-			int free_check;
-			NODE* garbage;
+			__declspec(align(16)) __int64 lo_top[2];
+			T* lo_return_value = nullptr;
+			LONG64 lo_value = InterlockedIncrement64(&m_unique_index);
+			ST_Node* lo_next = nullptr;
 
-			while (m_pool_top != nullptr)
+			do
 			{
-				garbage = m_pool_top;
+				lo_top[0] = m_pool_top.block_info[0];
+				lo_top[1] = m_pool_top.block_info[1];
+
+				if(lo_top[0] == 0)
+					return nullptr;
+				
+				lo_next = ((ST_Node*)lo_top[0])->next_node;
+				lo_return_value = &(((ST_Node*)(lo_top[0]))->instance);
+
+			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_value, (LONG64)lo_next, lo_top) == 0);
+
+			return lo_return_value;
+		}
+
+	public:
+		C_MemoryPool(bool p_is_placement_new = false)
+		{
+			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0); 
+			if (m_heap_handle == NULL)
+			{
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				ST_Log lo_log({ "Heap Create Error Code: " + to_string(GetLastError()) });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+			}
+
+			m_is_placementnew = p_is_placement_new;
+			m_use_count = 0;					m_alloc_count = 0;		m_unique_index = 1;
+			m_pool_top.block_info[0] = 0;	m_pool_top.block_info[1] = 0;
+		}
+
+		virtual	~C_MemoryPool()
+		{
+			bool lo_destroy_check;
+			int lo_free_check;
+			ST_Node* lo_garbage;
+
+			while (m_pool_top.block_info[0] != 0)
+			{
+				lo_garbage = (ST_Node*)m_pool_top.block_info[0];
 				if (m_is_placementnew == false)
-					garbage->s_data.~DATA();
+					lo_garbage->instance.~T();
 
-				m_alloc_count--;
-				m_pool_top = m_pool_top->s_next_block;
-				free_check = HeapFree(m_heap_handle, 0, garbage);
+				m_pool_top.block_info[0] = (LONG64)(((ST_Node*)m_pool_top.block_info[0])->next_node);
+				InterlockedDecrement(&m_alloc_count);
 
-				if (free_check == 0)
+				lo_free_check = HeapFree(m_heap_handle, 0, lo_garbage);
+				if (lo_free_check == 0)
 				{
-					TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
-					initializer_list<string> str = { "Heap Free Error Code: " + to_string(GetLastError()) };
-					LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-					throw;
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					ST_Log lo_log({ "Heap Free Error Code: " + to_string(GetLastError()) });
+					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 				}
 			}
 
-			destroy_check = HeapDestroy(m_heap_handle);
-			if (destroy_check == false)
+			lo_destroy_check = HeapDestroy(m_heap_handle);
+			if (lo_destroy_check == false)
 			{
-				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
-				initializer_list<string> str = { "Heap Destroy Error Code: " + to_string(GetLastError()) };
-				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-				throw;
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				ST_Log lo_log({ "Heap Destroy Error Code: " + to_string(GetLastError()) });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 		}
 
-		DATA* Alloc()
+		T* Alloc()
 		{
-			AcquireSRWLockExclusive(&m_pool_srw_lock);
-
-			if (m_pool_top->s_next_block == nullptr)
+			T* return_value;
+			while (1)
 			{
-				NODE *new_node = (NODE*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(NODE));
-				if (m_is_placementnew == false)
-					new(new_node) NODE();
+				if (m_pool_top.block_info[0] == 0)
+				{
+					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
+					if (m_is_placementnew == false)
+						new(new_node) ST_Node();
 
-				m_pool_top->s_next_block = new_node;
-				m_alloc_count++;
+					InterlockedIncrement(&m_use_count);
+					InterlockedIncrement(&m_alloc_count);
+					return &new_node->instance;
+				}
+
+				if (m_is_placementnew == true)
+					new((ST_Node*)m_pool_top.block_info[0]) ST_Node();
+
+				return_value = M_Pop();
+				if (return_value != nullptr)
+					break;
 			}
-			
-			if (m_is_placementnew == true)
-				new(m_pool_top->s_next_block) DATA();
-			
-			DATA* return_value = &m_pool_top->s_data;
-			m_pool_top = m_pool_top->s_next_block;
-			m_use_count++;
 
-			ReleaseSRWLockExclusive(&m_pool_srw_lock);
+			InterlockedIncrement(&m_use_count);
 			return return_value;
 		}
 
-		bool Free(DATA* pData)
+		bool Free(T* pData)
 		{
-			AcquireSRWLockExclusive(&m_pool_srw_lock);
-
-			if (*((char*)pData + sizeof(DATA)) == CHECK_SUM)
+			if (*((char*)pData + sizeof(T)) == CHECK_SUM)
 			{
 				if (m_is_placementnew == true)
-					pData->~DATA();
+					pData->~T();
 
-				m_pool_top = (NODE*)((char*)pData - sizeof(DATA*));
-				m_use_count--;
+				M_Push((ST_Node*)((char*)pData - sizeof(T*)));
+				InterlockedDecrement(&m_use_count);			
 				return true;
 			}
 			else
-			{
-				TCHAR action[] = _TEXT("MemoryPool"), server[] = _TEXT("NONE");
-				string object = typeid(DATA).name(), param = typeid(pData).name();
-
-				initializer_list<string> str = { "PoolAlloc Type: [" + object + "], Free_Value Type: [" + param + "]" };
-				LOG::PrintLog(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-
-				m_wrong_free++;
 				return false;
-			}
-
-			ReleaseSRWLockExclusive(&m_pool_srw_lock);
 		}
 	
 		int	GetAllocCount() const // 메모리풀 내부의 전체 개수

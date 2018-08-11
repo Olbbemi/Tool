@@ -17,22 +17,21 @@ using namespace std;
  *  1. 실행에서 메인이될 cpp 파일의 전역으로 Log 객체 생성 ( SRWLock 초기화 목적 )
  *  2. 각 실행파일이 실행될 때 남겨질 로그가 저장될 폴더를 _MAKEDIR 매크로를 이용하여 생성
  *  3. 로그남길 경우 _LOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류 ] 
- *  4. 로그를 남겨야하는 파일에서는 아래와 같은 구조체를 정의하여 로그 함수 호출
- *  ------------------------------------------------------- 
- *  ST_Log
- *  {
- *	 	int count;
- * 		string log_str[size];
- *
- *      ST_Log(initializer_list<string> pa_log) : count(0)
- *	    {
- *			for(auto p : pa_log)
- *				log_str[count++] = p;
- *      }
- *  }
- *  -------------------------------------------------------
+ *  4. 로그를 남겨야하는 파일에서는 ST_Log 객체를 정의하고 로그 함수 인자로 사용한 뒤 로그 함수 호출
  *  5. 바이너리 로그를 남길 경우 _BinaryLOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류, Size: 바이너리 크기 ]
  */
+
+struct ST_Log
+{
+	int count;
+	string log_str[20];
+
+	ST_Log(initializer_list<string> pa_log) : count(0)
+	{
+		for (auto p : pa_log)
+			log_str[count++] = p;
+	}
+};
 
 class C_Log
 {
