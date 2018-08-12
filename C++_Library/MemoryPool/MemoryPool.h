@@ -66,24 +66,24 @@ namespace Olbbemi
 		T* M_Pop()
 		{
 			__declspec(align(16)) __int64 lo_top[2];
-			T* lo_return_value = nullptr;
 			LONG64 lo_value = InterlockedIncrement64(&m_unique_index);
 			ST_Node* lo_next = nullptr;
 
 			do
 			{
-				lo_top[0] = m_pool_top.block_info[0];
-				lo_top[1] = m_pool_top.block_info[1];
+				lo_top[0] = 0;	lo_top[1] = 0;
+				InterlockedCompareExchange128(m_pool_top.block_info, 0, 0, lo_top);
 
 				if(lo_top[0] == 0)
 					return nullptr;
 				
 				lo_next = ((ST_Node*)lo_top[0])->next_node;
-				lo_return_value = &(((ST_Node*)(lo_top[0]))->instance);
-
 			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_value, (LONG64)lo_next, lo_top) == 0);
 
-			return lo_return_value;
+			if (m_is_placementnew == true)
+				new((ST_Node*)lo_top[0]) ST_Node();
+
+			return &(((ST_Node*)(lo_top[0]))->instance);
 		}
 
 	public:
@@ -150,9 +150,6 @@ namespace Olbbemi
 					InterlockedIncrement(&m_alloc_count);
 					return &new_node->instance;
 				}
-
-				if (m_is_placementnew == true)
-					new((ST_Node*)m_pool_top.block_info[0]) ST_Node();
 
 				return_value = M_Pop();
 				if (return_value != nullptr)
