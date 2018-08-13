@@ -45,40 +45,39 @@ namespace Olbbemi
 			volatile __int64 block_info[2];
 		};
 
+		bool m_is_placementnew;
 		LONG m_use_count, m_alloc_count;
 		HANDLE m_heap_handle;
 		__declspec(align(16)) ST_Top m_pool_top;
 
-		bool m_is_placementnew;
-		__int64 m_unique_index;
-
 		void M_Push(ST_Node* pa_new_node)
 		{
-			__int64 lo_top;
+			__declspec(align(16)) __int64 lo_top[2];		
 
 			do
 			{
-				lo_top = m_pool_top.block_info[0];
-				pa_new_node->next_node = (ST_Node*)lo_top;
-			} while (InterlockedCompareExchange64((LONG64*)&m_pool_top.block_info[0], (LONG64)pa_new_node, lo_top) != lo_top);
+				lo_top[0] = m_pool_top.block_info[0];	
+				lo_top[1] = m_pool_top.block_info[1];
+				
+				pa_new_node->next_node = (ST_Node*)lo_top[0];
+			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)pa_new_node, lo_top) == 0);
 		}
 
 		T* M_Pop()
 		{
-			__declspec(align(16)) __int64 lo_top[2];
-			LONG64 lo_value = InterlockedIncrement64(&m_unique_index);
+			__declspec(align(16)) __int64 lo_top[2];		
 			ST_Node* lo_next = nullptr;
 
 			do
 			{
-				lo_top[0] = 0;	lo_top[1] = 0;
-				InterlockedCompareExchange128(m_pool_top.block_info, 0, 0, lo_top);
-
+				lo_top[0] = m_pool_top.block_info[0];	
+				lo_top[1] = m_pool_top.block_info[1];
+			
 				if(lo_top[0] == 0)
 					return nullptr;
 				
 				lo_next = ((ST_Node*)lo_top[0])->next_node;
-			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_value, (LONG64)lo_next, lo_top) == 0);
+			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)lo_next, lo_top) == 0);
 
 			if (m_is_placementnew == true)
 				new((ST_Node*)lo_top[0]) ST_Node();
@@ -98,8 +97,8 @@ namespace Olbbemi
 			}
 
 			m_is_placementnew = p_is_placement_new;
-			m_use_count = 0;					m_alloc_count = 0;		m_unique_index = 1;
-			m_pool_top.block_info[0] = 0;	m_pool_top.block_info[1] = 0;
+			m_use_count = 0;					m_alloc_count = 0;
+			m_pool_top.block_info[0] = 0;	m_pool_top.block_info[1] = 1;
 		}
 
 		virtual	~C_MemoryPool()
@@ -135,7 +134,7 @@ namespace Olbbemi
 			}
 		}
 
-		T* Alloc()
+		T* M_Alloc()
 		{
 			T* return_value;
 			while (1)
@@ -160,27 +159,27 @@ namespace Olbbemi
 			return return_value;
 		}
 
-		bool Free(T* pData)
+		bool M_Free(T* pData)
 		{
 			if (*((char*)pData + sizeof(T)) == CHECK_SUM)
 			{
 				if (m_is_placementnew == true)
 					pData->~T();
 
+				InterlockedDecrement(&m_use_count);
 				M_Push((ST_Node*)((char*)pData - sizeof(T*)));
-				InterlockedDecrement(&m_use_count);			
 				return true;
 			}
 			else
 				return false;
 		}
 	
-		int	GetAllocCount() const // 메모리풀 내부의 전체 개수
+		int	M_GetAllocCount() const // 메모리풀 내부의 전체 개수
 		{
 			return m_alloc_count;
 		}
 	
-		int	GetUseCount() const // 현재 사용중인 블럭 개수
+		int	M_GetUseCount() const // 현재 사용중인 블럭 개수
 		{ 
 			return m_use_count;
 		}
