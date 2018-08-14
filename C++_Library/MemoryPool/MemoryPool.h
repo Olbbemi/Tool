@@ -46,7 +46,7 @@ namespace Olbbemi
 		};
 
 		bool m_is_placementnew;
-		LONG m_use_count, m_alloc_count;
+		LONG m_use_count, m_alloc_count, m_alloc_max_count;
 		HANDLE m_heap_handle;
 		__declspec(align(16)) ST_Top m_pool_top;
 
@@ -86,7 +86,7 @@ namespace Olbbemi
 		}
 
 	public:
-		C_MemoryPool(bool p_is_placement_new = false)
+		C_MemoryPool(LONG pa_max_alloc_count = 0, bool pa_is_placement_new = false)
 		{
 			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0); 
 			if (m_heap_handle == NULL)
@@ -96,9 +96,22 @@ namespace Olbbemi
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
-			m_is_placementnew = p_is_placement_new;
-			m_use_count = 0;					m_alloc_count = 0;
-			m_pool_top.block_info[0] = 0;	m_pool_top.block_info[1] = 1;
+			m_alloc_max_count = pa_max_alloc_count;	 m_is_placementnew = pa_is_placement_new;
+			m_use_count = 0;						 m_alloc_count = 0;
+			m_pool_top.block_info[0] = 0;			 m_pool_top.block_info[1] = 1;
+
+			if (m_alloc_max_count != 0)
+			{
+				for (int i = 0; i < m_alloc_max_count; i++)
+				{
+					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
+					if (m_is_placementnew == false)
+						new(new_node) ST_Node();
+
+					InterlockedIncrement(&m_alloc_count);
+					M_Push(new_node);
+				}
+			}
 		}
 
 		virtual	~C_MemoryPool()
