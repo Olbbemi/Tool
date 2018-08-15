@@ -58,10 +58,6 @@ namespace Olbbemi
 
 		T M_Pop()
 		{
-			/*
-			 * 사용할 컨텐츠의 환경에 따라 스택이 비어있는경우에 시스템로그 및 Crash 발생일지 false 를 반환할지 결정하기
-			 */
-
 			if (InterlockedDecrement(&m_use_count) < 0)
 			{
 				TCHAR lo_action[] = _TEXT("LFStack"), lo_server[] = _TEXT("NONE");
@@ -99,7 +95,6 @@ namespace Olbbemi
 		{
 			return m_use_count;
 		}
-
 	};
 }
 
