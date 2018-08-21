@@ -14,15 +14,15 @@
 #include <Windows.h>
 #include <strsafe.h>
 
-/*
- * 메모리 풀은 기본 힙을 사용하지 않음 ( HeapCreate, HeapAlloc, HeapFree, HeapDestroy 이용 )
- * placement new : new 연산자에서 제공하는 3가지 성질 [ 1.동적할당, 2.객체에 대하여 생성자 호출, 3.가상테이블 생성 ] 중 2, 3번을 수행하는 연산자
- * MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 false : NODE 생성 시 최초에 한번만 생성자호출 및 소멸자 호출 [ malloc 으로 할당하고 placement_new 호출, 소멸자 직접 호출 ]
- * MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 true :  NODE 생성 시에는 malloc으로 할당, 외부에서 Alloc 및 Free 함수를 호출할 때마다 placement_new 이용하여 생성자 및 소멸자 호출 ]
- */
-
 namespace Olbbemi
 {
+   /*
+	* 메모리 풀은 기본 힙을 사용하지 않음 ( HeapCreate, HeapAlloc, HeapFree, HeapDestroy 이용 )
+	* placement new : new 연산자에서 제공하는 3가지 성질 [ 1.동적할당, 2.객체에 대하여 생성자 호출, 3.가상테이블 생성 ] 중 2, 3번을 수행하는 연산자
+	* MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 false : NODE 생성 시 최초에 한번만 생성자호출 및 소멸자 호출 [ malloc 으로 할당하고 placement_new 호출, 소멸자 직접 호출 ]
+	* MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 true :  NODE 생성 시에는 malloc으로 할당, 외부에서 Alloc 및 Free 함수를 호출할 때마다 placement_new 이용하여 생성자 및 소멸자 호출 ]
+	*/
+
 	template <class T>
 	class C_MemoryPool
 	{
@@ -39,43 +39,44 @@ namespace Olbbemi
 				checksum = CHECK_SUM;
 			}
 		};
-		
+
 		struct ST_Top
 		{
 			volatile __int64 block_info[2];
 		};
 
 		bool m_is_placementnew;
-		LONG m_use_count, m_alloc_count, m_alloc_max_count;
+		LONG m_use_count, m_alloc_count, m_max_alloc_count;
+	
 		HANDLE m_heap_handle;
 		__declspec(align(16)) ST_Top m_pool_top;
 
 		void M_Push(ST_Node* pa_new_node)
 		{
-			__declspec(align(16)) __int64 lo_top[2];		
+			__declspec(align(16)) __int64 lo_top[2];
 
 			do
 			{
-				lo_top[0] = m_pool_top.block_info[0];	
+				lo_top[0] = m_pool_top.block_info[0];
 				lo_top[1] = m_pool_top.block_info[1];
-				
+
 				pa_new_node->next_node = (ST_Node*)lo_top[0];
 			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)pa_new_node, lo_top) == 0);
 		}
 
 		T* M_Pop()
 		{
-			__declspec(align(16)) __int64 lo_top[2];		
+			__declspec(align(16)) __int64 lo_top[2];
 			ST_Node* lo_next = nullptr;
 
 			do
 			{
-				lo_top[0] = m_pool_top.block_info[0];	
+				lo_top[0] = m_pool_top.block_info[0];
 				lo_top[1] = m_pool_top.block_info[1];
-			
-				if(lo_top[0] == 0)
+
+				if (lo_top[0] == 0)
 					return nullptr;
-				
+
 				lo_next = ((ST_Node*)lo_top[0])->next_node;
 			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)lo_next, lo_top) == 0);
 
@@ -96,20 +97,20 @@ namespace Olbbemi
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
-			m_alloc_max_count = pa_max_alloc_count;	 m_is_placementnew = pa_is_placement_new;
-			m_use_count = 0;						 m_alloc_count = 0;
-			m_pool_top.block_info[0] = 0;			 m_pool_top.block_info[1] = 1;
+			m_max_alloc_count = pa_max_alloc_count;		m_is_placementnew = pa_is_placement_new;
+			m_use_count = 0;							m_alloc_count = 0;
+			m_pool_top.block_info[0] = 0;				m_pool_top.block_info[1] = 1;
 
-			if (m_alloc_max_count != 0)
+			if (m_max_alloc_count != 0)
 			{
-				for (int i = 0; i < m_alloc_max_count; i++)
+				for (int i = 0; i < m_max_alloc_count; i++)
 				{
 					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
 					if (m_is_placementnew == false)
 						new(new_node) ST_Node();
-
-					InterlockedIncrement(&m_alloc_count);
+				
 					M_Push(new_node);
+					InterlockedIncrement(&m_alloc_count);
 				}
 			}
 		}
@@ -117,7 +118,7 @@ namespace Olbbemi
 		virtual	~C_MemoryPool()
 		{
 			bool lo_destroy_check;
-			int lo_free_check;
+			BOOL lo_free_check;
 			ST_Node* lo_garbage;
 
 			while (m_pool_top.block_info[0] != 0)
@@ -187,14 +188,12 @@ namespace Olbbemi
 				return false;
 		}
 	
-		int	M_GetAllocCount() const // 메모리풀 내부의 전체 개수
+	   /**--------------------------
+		 *  Return Total Alloc Node
+		 *--------------------------*/
+		LONG M_GetAllocCount() const
 		{
 			return m_alloc_count;
-		}
-	
-		int	M_GetUseCount() const // 현재 사용중인 블럭 개수
-		{ 
-			return m_use_count;
 		}
 	};
 }

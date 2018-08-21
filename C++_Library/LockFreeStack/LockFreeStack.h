@@ -2,17 +2,12 @@
 #define LF_Stack_Info
 
 #include "Log/Log.h"
-#include "MemoryPool.h"
+#include "MemoryPool/MemoryPool.h"
 
 #include <Windows.h>
 
 namespace Olbbemi
 {
-	/*
-	 * STL 에서 제공하는 stack 과 유사
-	 * Pop 시도할 때 Top 이 비어있으면 Log + Crash
-	 */
-
 	template<class T>
 	class C_LFStack
 	{
@@ -35,14 +30,13 @@ namespace Olbbemi
 	public:
 		C_LFStack()
 		{
-			stack_size = 0;
+			m_pool = new C_MemoryPool<ST_Node>(0, false);
 			m_top.block_info[0] = 0;	m_top.block_info[1] = 1;
-			m_pool = new C_MemoryPool<ST_Node>(10, false);
 		}
 
 		void M_Push(T pa_data)
 		{
-			__int64 lo_top[2];
+			__declspec(align(16))__int64 lo_top[2];
 			ST_Node* new_node = m_pool->M_Alloc();
 			new_node->data = pa_data;	new_node->link = nullptr;
 
@@ -81,19 +75,9 @@ namespace Olbbemi
 			return lo_return_value;
 		}
 
-		int M_GetAllocCount()
+		LONG M_GetAllocCount() const
 		{
 			return m_pool->M_GetAllocCount();
-		}
-
-		int M_GetUseCount()
-		{
-			return m_pool->M_GetUseCount();
-		}
-
-		int M_GetStacksize()
-		{
-			return m_use_count;
 		}
 	};
 }

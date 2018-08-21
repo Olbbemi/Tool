@@ -1,81 +1,100 @@
 #include "Precompile.h"
-#include "Log.h"
+#include "Log/Log.h"
 #include "Serialize.h"
 
 #include <stdlib.h>
 #include <string.h>
 using namespace Olbbemi;
 
-SERIALIZE::SERIALIZE()
+C_MemoryPool<C_Serialize> C_Serialize::s_memory_pool(10, false);
+
+C_Serialize* C_Serialize::S_Alloc()
+{
+	C_Serialize* lo_serialQ = s_memory_pool.M_Alloc();
+	InterlockedIncrement(&lo_serialQ->m_ref_count);
+	return lo_serialQ;
+}
+
+void C_Serialize::S_Free(C_Serialize* pa_serialQ)
+{
+	LONG lo_ref_count = InterlockedDecrement(&pa_serialQ->m_ref_count);
+	if (lo_ref_count == 0)
+		s_memory_pool.M_Free(pa_serialQ);
+}
+
+void C_Serialize::S_AddReference(C_Serialize* pa_serialQ)
+{
+	InterlockedIncrement(&pa_serialQ->m_ref_count);
+}
+
+C_Serialize::C_Serialize()
 {
 	m_front = m_rear = 0;
-	m_total_length = SERIALIZE_BUFFER_SIZE;
+	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 
 	m_buffer_ptr = (char*)malloc(SERIALIZE_BUFFER_SIZE);
 	if (m_buffer_ptr == nullptr)
 	{
-		TCHAR action[] = _TEXT("SERIALIZE"), server[] = _TEXT("NONE");
-		initializer_list<string> str = { "Seiralize malloc Fail" };
+		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("NONE");
+		ST_Log lo_log({"Seiralize Malloc Fail"});
 
-		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-		throw;
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
 }
 
-SERIALIZE::~SERIALIZE()
+C_Serialize::~C_Serialize()
 {
 	free(m_buffer_ptr);
 }
 
-void SERIALIZE::Resize(int p_remain_size, int p_input_size)
+void C_Serialize::M_Resize(int p_remain_size, int p_input_size)
 {
-	while (p_remain_size + m_total_length <= p_input_size)
-		m_total_length += SERIALIZE_BUFFER_SIZE;
+	while (p_remain_size + m_maximum_size <= p_input_size)
+		m_maximum_size += SERIALIZE_BUFFER_SIZE;
 
-	char* temp_buffer = (char*)malloc(m_total_length);
+	char* temp_buffer = (char*)malloc(m_maximum_size);
 	if (temp_buffer == nullptr)
 	{
-		TCHAR action[] = _TEXT("SERIALIZE"), server[] = _TEXT("NONE");
-		initializer_list<string> str = { "Seiralize Resize malloc Fail" };
-
-		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-		throw;
+		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("NONE");
+		ST_Log lo_log({ "Seiralize Resize malloc Fail" });
+		
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
 
-	memcpy_s(temp_buffer, m_total_length, m_buffer_ptr, m_total_length);
+	memcpy_s(temp_buffer, m_maximum_size, m_buffer_ptr, m_maximum_size);
 
 	free(m_buffer_ptr);
 	m_buffer_ptr = temp_buffer;
 }
 
-int SERIALIZE::GetUsingSize() const
+int C_Serialize::M_GetUsingSize() const
 {
 	return m_rear - m_front;
 }
 
-int SERIALIZE::GetUnusingSize() const
+int C_Serialize::M_GetUnusingSize() const
 {
 	return SERIALIZE_BUFFER_SIZE - m_rear - 1;
 }
 
-void SERIALIZE::InputHeaderSize(int p_header_size)
+void C_Serialize::M_InputHeaderSize(int p_header_size)
 {
 	m_front = m_rear = p_header_size;
-	m_total_length = SERIALIZE_BUFFER_SIZE;
+	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 }
 
-void SERIALIZE::MakeHeader(const char *p_src, const int p_size)
+void C_Serialize::M_MakeHeader(const char *p_src, const int p_size)
 {
 	m_front = 0;
 	memcpy_s(m_buffer_ptr, SERIALIZE_BUFFER_SIZE, p_src, p_size);
 }
 
-void SERIALIZE::Enqueue(char *p_src, const int p_size)
+void C_Serialize::M_Enqueue(char *p_src, const int p_size)
 {
-	int remain_size = GetUnusingSize();
+	int remain_size = M_GetUnusingSize();
 
 	if (remain_size < p_size)
-		Resize(remain_size, p_size);
+		M_Resize(remain_size, p_size);
 
 	switch (p_size)
 	{
@@ -89,9 +108,9 @@ void SERIALIZE::Enqueue(char *p_src, const int p_size)
 	m_rear += p_size;
 }
 
-void SERIALIZE::Dequeue(char *p_dest, const int p_size)
+void C_Serialize::M_Dequeue(char *p_dest, const int p_size)
 {
-	if (GetUsingSize() < p_size)
+	if (M_GetUsingSize() < p_size)
 		return;
 	
 	switch (p_size)
@@ -106,17 +125,17 @@ void SERIALIZE::Dequeue(char *p_dest, const int p_size)
 	m_front += p_size;
 }
 
-void SERIALIZE::MoveFront(const int p_size)
+void C_Serialize::M_MoveFront(const int p_size)
 {
 	m_front += p_size;
 }
 
-void SERIALIZE::MoveRear(const int p_size)
+void C_Serialize::M_MoveRear(const int p_size)
 {
 	m_rear += p_size;
 }
 
-char* SERIALIZE::GetBufferPtr() const
+char* C_Serialize::M_GetBufferPtr() const
 {
 	return m_buffer_ptr + m_front;
 }

@@ -1,36 +1,34 @@
 #include "Precompile.h"
-#include "Log.h"
+#include "Log/Log.h"
 #include "RingBuffer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <exception>
 
 #define BUFSIZE 10000
 
 using namespace Olbbemi;
 
-RINGBUFFER::RINGBUFFER()
+C_RINGBUFFER::C_RINGBUFFER()
 {
 	m_buffer = (char*)malloc(BUFSIZE);
 	if (m_buffer == nullptr)
 	{
-		TCHAR action[] = _TEXT("RINGBUFFER"), server[] = _TEXT("NONE");
-		initializer_list<string> str = { "Ringbuffer malloc Fail" };
+		TCHAR lo_action[] = _TEXT("RINGBUFFER"), lo_server[] = _TEXT("NONE");
+		ST_Log lo_log({ "Ringbuffer Malloc Fail" });
 
-		_LOG(__LINE__, LOG_LEVEL_ERROR, action, server, str);
-		throw;
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
 
 	m_front = m_rear = 0;
 }
 
-RINGBUFFER::~RINGBUFFER()
+C_RINGBUFFER::~C_RINGBUFFER()
 {
 	free(m_buffer);
 }
 
-int RINGBUFFER::GetUseSize() const
+int C_RINGBUFFER::M_GetUseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -40,7 +38,7 @@ int RINGBUFFER::GetUseSize() const
 		return t_rear - t_front;
 }
 
-int RINGBUFFER::GetUnuseSize() const
+int C_RINGBUFFER::M_GetUnuseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -50,11 +48,11 @@ int RINGBUFFER::GetUnuseSize() const
 		return (BUFSIZE - 1) - (t_rear - t_front);
 }
 
-bool RINGBUFFER::Enqueue(char *p_data, const int p_size)
+bool C_RINGBUFFER::M_Enqueue(char *pa_data, const int pa_size)
 {
-	int gap, unusing_data = GetUnuseSize(), t_front = m_front, t_rear = m_rear;
+	int gap, unusing_data = M_GetUnuseSize(), t_front = m_front, t_rear = m_rear;
 
-	if ((t_rear + 1) % BUFSIZE == m_front || unusing_data < p_size)
+	if ((t_rear + 1) % BUFSIZE == m_front || unusing_data < pa_size)
 		return false;
 
 	t_rear++;
@@ -62,53 +60,53 @@ bool RINGBUFFER::Enqueue(char *p_data, const int p_size)
 		t_rear = 0;
 
 	gap = BUFSIZE - t_rear;
-	if (gap < p_size)
+	if (gap < pa_size)
 	{
 		switch (gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(m_buffer + t_rear)) = *(reinterpret_cast<char*>(p_data));				break;
-			case 2:		*(reinterpret_cast<short*>(m_buffer + t_rear)) = *(reinterpret_cast<short*>(p_data));			break;
-			case 4:		*(reinterpret_cast<int*>(m_buffer + t_rear)) = *(reinterpret_cast<int*>(p_data));				break;
-			case 8:		*(reinterpret_cast<long long*> (m_buffer + t_rear)) = *(reinterpret_cast<long long*>(p_data));	break;
-			default:	memcpy_s(m_buffer + t_rear, BUFSIZE, p_data, gap);												break;
+			case 1:		*(reinterpret_cast<char*>(m_buffer + t_rear)) = *(reinterpret_cast<char*>(pa_data));				break;
+			case 2:		*(reinterpret_cast<short*>(m_buffer + t_rear)) = *(reinterpret_cast<short*>(pa_data));				break;
+			case 4:		*(reinterpret_cast<int*>(m_buffer + t_rear)) = *(reinterpret_cast<int*>(pa_data));					break;
+			case 8:		*(reinterpret_cast<long long*> (m_buffer + t_rear)) = *(reinterpret_cast<long long*>(pa_data));		break;
+			default:	memcpy_s(m_buffer + t_rear, BUFSIZE, pa_data, gap);													break;
 		}
 
-		switch (p_size - gap)
+		switch (pa_size - gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(m_buffer)) = *(reinterpret_cast<char*>(p_data + gap));				break;
-			case 2:		*(reinterpret_cast<short*>(m_buffer)) = *(reinterpret_cast<short*>(p_data + gap));			break;
-			case 4:		*(reinterpret_cast<int*>(m_buffer)) = *(reinterpret_cast<int*>(p_data + gap));				break;
-			case 8:		*(reinterpret_cast<long long*>(m_buffer)) = *(reinterpret_cast<long long*>(p_data + gap));	break;
-			default:	memcpy_s(m_buffer, BUFSIZE, p_data + gap, p_size - gap);											break;
+			case 1:		*(reinterpret_cast<char*>(m_buffer)) = *(reinterpret_cast<char*>(pa_data + gap));				break;
+			case 2:		*(reinterpret_cast<short*>(m_buffer)) = *(reinterpret_cast<short*>(pa_data + gap));				break;
+			case 4:		*(reinterpret_cast<int*>(m_buffer)) = *(reinterpret_cast<int*>(pa_data + gap));					break;
+			case 8:		*(reinterpret_cast<long long*>(m_buffer)) = *(reinterpret_cast<long long*>(pa_data + gap));		break;
+			default:	memcpy_s(m_buffer, BUFSIZE, pa_data + gap, pa_size - gap);										break;
 		}
 
-		m_rear = p_size - gap - 1;
+		m_rear = pa_size - gap - 1;
 	}
 	else
 	{
-		switch (p_size)
+		switch (pa_size)
 		{
-			case 1:		*(reinterpret_cast<char*>(m_buffer + t_rear)) = *(reinterpret_cast<char*>(p_data));				break;
-			case 2:		*(reinterpret_cast<short*>(m_buffer + t_rear)) = *(reinterpret_cast<short*>(p_data));			break;
-			case 4:		*(reinterpret_cast<int*>(m_buffer + t_rear)) = *(reinterpret_cast<int*>(p_data));				break;
-			case 8:		*(reinterpret_cast<long long*>(m_buffer + t_rear)) = *(reinterpret_cast<long long*> (p_data));	break;
-			default:	memcpy_s(m_buffer + t_rear, BUFSIZE, p_data, p_size);											break;
+			case 1:		*(reinterpret_cast<char*>(m_buffer + t_rear)) = *(reinterpret_cast<char*>(pa_data));				break;
+			case 2:		*(reinterpret_cast<short*>(m_buffer + t_rear)) = *(reinterpret_cast<short*>(pa_data));				break;
+			case 4:		*(reinterpret_cast<int*>(m_buffer + t_rear)) = *(reinterpret_cast<int*>(pa_data));					break;
+			case 8:		*(reinterpret_cast<long long*>(m_buffer + t_rear)) = *(reinterpret_cast<long long*> (pa_data));		break;
+			default:	memcpy_s(m_buffer + t_rear, BUFSIZE, pa_data, pa_size);												break;
 		}
 
-		if (BUFSIZE <= m_rear + p_size)
-			m_rear += p_size - BUFSIZE;
+		if (BUFSIZE <= m_rear + pa_size)
+			m_rear += pa_size - BUFSIZE;
 		else
-			m_rear += p_size;
+			m_rear += pa_size;
 	}
 
 	return true;
 }
 
-bool RINGBUFFER::Dequeue(char *p_dest, const int p_size)
+bool C_RINGBUFFER::M_Dequeue(char *pa_dest, const int pa_size)
 {
-	int gap, using_data = GetUseSize(), t_front = m_front, t_rear = m_rear;
+	int gap, using_data = M_GetUseSize(), t_front = m_front, t_rear = m_rear;
 
-	if (t_rear == t_front || using_data < p_size)
+	if (t_rear == t_front || using_data < pa_size)
 		return false;
 
 	t_front++;
@@ -116,53 +114,53 @@ bool RINGBUFFER::Dequeue(char *p_dest, const int p_size)
 		t_front = 0;
 
 	gap = BUFSIZE - t_front;
-	if (gap < p_size)
+	if (gap < pa_size)
 	{
 		switch (gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest)) = *(reinterpret_cast<char*>(m_buffer + t_front));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest)) = *(reinterpret_cast<short*>(m_buffer + t_front));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest)) = *(reinterpret_cast<int*>(m_buffer + t_front));				break;
-			case 8:		*(reinterpret_cast<long long*> (p_dest)) = *(reinterpret_cast<long long*>(m_buffer + t_front));	break;
-			default:	memcpy_s(p_dest, gap, m_buffer + t_front, gap);													break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest)) = *(reinterpret_cast<char*>(m_buffer + t_front));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest)) = *(reinterpret_cast<short*>(m_buffer + t_front));				break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest)) = *(reinterpret_cast<int*>(m_buffer + t_front));					break;
+			case 8:		*(reinterpret_cast<long long*> (pa_dest)) = *(reinterpret_cast<long long*>(m_buffer + t_front));	break;
+			default:	memcpy_s(pa_dest, gap, m_buffer + t_front, gap);													break;
 		}
 
-		switch (p_size - gap)
+		switch (pa_size - gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest + gap)) = *(reinterpret_cast<char*>(m_buffer));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest + gap)) = *(reinterpret_cast<short*>(m_buffer));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest + gap)) = *(reinterpret_cast<int*>(m_buffer));				break;
-			case 8:		*(reinterpret_cast<long long*> (p_dest + gap)) = *(reinterpret_cast<long long*>(m_buffer));	break;
-			default:	memcpy_s(p_dest + gap, p_size - gap, m_buffer, p_size - gap);									break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest + gap)) = *(reinterpret_cast<char*>(m_buffer));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest + gap)) = *(reinterpret_cast<short*>(m_buffer));				break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest + gap)) = *(reinterpret_cast<int*>(m_buffer));					break;
+			case 8:		*(reinterpret_cast<long long*> (pa_dest + gap)) = *(reinterpret_cast<long long*>(m_buffer));	break;
+			default:	memcpy_s(pa_dest + gap, pa_size - gap, m_buffer, pa_size - gap);								break;
 		}
 
-		m_front = p_size - gap - 1;
+		m_front = pa_size - gap - 1;
 	}
 	else
 	{
-		switch (p_size)
+		switch (pa_size)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest)) = *(reinterpret_cast<char*>(m_buffer + t_front));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest)) = *(reinterpret_cast<short*>(m_buffer + t_front));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest)) = *(reinterpret_cast<int*>(m_buffer + t_front));				break;
-			case 8:		*(reinterpret_cast<long long*> (p_dest)) = *(reinterpret_cast<long long*>(m_buffer + t_front));	break;
-			default:	memcpy_s(p_dest, p_size, m_buffer + t_front, p_size);											break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest)) = *(reinterpret_cast<char*>(m_buffer + t_front));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest)) = *(reinterpret_cast<short*>(m_buffer + t_front));				break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest)) = *(reinterpret_cast<int*>(m_buffer + t_front));					break;
+			case 8:		*(reinterpret_cast<long long*> (pa_dest)) = *(reinterpret_cast<long long*>(m_buffer + t_front));	break;
+			default:	memcpy_s(pa_dest, pa_size, m_buffer + t_front, pa_size);											break;
 		}
 
-		if (BUFSIZE <= m_front + p_size)
-			m_front += p_size - BUFSIZE;
+		if (BUFSIZE <= m_front + pa_size)
+			m_front += pa_size - BUFSIZE;
 		else
-			m_front += p_size;
+			m_front += pa_size;
 	}
 
 	return true;
 }
 
-bool RINGBUFFER::Peek(char *p_dest, const int p_size, int &p_return_size)
+bool C_RINGBUFFER::M_Peek(char *pa_dest, const int pa_size, int &pa_return_size)
 {
-	int gap, temp, using_data = GetUseSize(), t_front = m_front, t_rear = m_rear;
+	int gap, temp, using_data = M_GetUseSize(), t_front = m_front, t_rear = m_rear;
 
-	if (t_rear == t_front || using_data < p_size)
+	if (t_rear == t_front || using_data < pa_size)
 		return false;
 
 	temp = t_front + 1;
@@ -170,48 +168,48 @@ bool RINGBUFFER::Peek(char *p_dest, const int p_size, int &p_return_size)
 		temp = 0;
 
 	gap = BUFSIZE - temp;
-	if (gap < p_size)
+	if (gap < pa_size)
 	{
 		switch (gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest)) = *(reinterpret_cast<char*>(m_buffer + temp));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest)) = *(reinterpret_cast<short*>(m_buffer + temp));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest)) = *(reinterpret_cast<int*>(m_buffer + temp));				break;
-			case 8:		*(reinterpret_cast<long long*>(p_dest)) = *(reinterpret_cast<long long*>(m_buffer + temp));	break;
-			default:	memcpy_s(p_dest, gap, m_buffer + temp, gap);												break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest)) = *(reinterpret_cast<char*>(m_buffer + temp));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest)) = *(reinterpret_cast<short*>(m_buffer + temp));			break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest)) = *(reinterpret_cast<int*>(m_buffer + temp));				break;
+			case 8:		*(reinterpret_cast<long long*>(pa_dest)) = *(reinterpret_cast<long long*>(m_buffer + temp));	break;
+			default:	memcpy_s(pa_dest, gap, m_buffer + temp, gap);													break;
 		}
 
-		switch (p_size - gap)
+		switch (pa_size - gap)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest + gap)) = *(reinterpret_cast<char*>(m_buffer));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest + gap)) = *(reinterpret_cast<short*>(m_buffer));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest + gap)) = *(reinterpret_cast<int*>(m_buffer));				break;
-			case 8:		*(reinterpret_cast<long long*>(p_dest + gap)) = *(reinterpret_cast<long long*>(m_buffer));	break;
-			default:	memcpy_s(p_dest + gap, p_size - gap, m_buffer, p_size - gap);								break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest + gap)) = *(reinterpret_cast<char*>(m_buffer));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest + gap)) = *(reinterpret_cast<short*>(m_buffer));				break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest + gap)) = *(reinterpret_cast<int*>(m_buffer));					break;
+			case 8:		*(reinterpret_cast<long long*>(pa_dest + gap)) = *(reinterpret_cast<long long*>(m_buffer));		break;
+			default:	memcpy_s(pa_dest + gap, pa_size - gap, m_buffer, pa_size - gap);								break;
 		}
 	}
 	else
 	{
-		switch (p_size)
+		switch (pa_size)
 		{
-			case 1:		*(reinterpret_cast<char*>(p_dest)) = *(reinterpret_cast<char*>(m_buffer + temp));			break;
-			case 2:		*(reinterpret_cast<short*>(p_dest)) = *(reinterpret_cast<short*>(m_buffer + temp));			break;
-			case 4:		*(reinterpret_cast<int*>(p_dest)) = *(reinterpret_cast<int*>(m_buffer + temp));				break;
-			case 8:		*(reinterpret_cast<long long*>(p_dest)) = *(reinterpret_cast<long long*>(m_buffer + temp));	break;
-			default:	memcpy_s(p_dest, p_size, m_buffer + temp, p_size);											break;
+			case 1:		*(reinterpret_cast<char*>(pa_dest)) = *(reinterpret_cast<char*>(m_buffer + temp));				break;
+			case 2:		*(reinterpret_cast<short*>(pa_dest)) = *(reinterpret_cast<short*>(m_buffer + temp));			break;
+			case 4:		*(reinterpret_cast<int*>(pa_dest)) = *(reinterpret_cast<int*>(m_buffer + temp));				break;
+			case 8:		*(reinterpret_cast<long long*>(pa_dest)) = *(reinterpret_cast<long long*>(m_buffer + temp));	break;
+			default:	memcpy_s(pa_dest, pa_size, m_buffer + temp, pa_size);											break;
 		}
 	}
 
-	p_return_size += p_size;
+	pa_return_size += pa_size;
 	return true;
 }
 
-char* RINGBUFFER::GetBasicPtr() const
+char* C_RINGBUFFER::M_GetBasicPtr() const
 {
 	return m_buffer;
 }
 
-char* RINGBUFFER::GetFrontPtr() const
+char* C_RINGBUFFER::M_GetFrontPtr() const
 {
 	int front_temp = m_front + 1;
 	if (front_temp == BUFSIZE)
@@ -220,7 +218,7 @@ char* RINGBUFFER::GetFrontPtr() const
 	return m_buffer + front_temp;
 }
 
-char* RINGBUFFER::GetRearPtr() const
+char* C_RINGBUFFER::M_GetRearPtr() const
 {
 	int rear_temp = m_rear + 1;
 	if (rear_temp == BUFSIZE)
@@ -229,27 +227,27 @@ char* RINGBUFFER::GetRearPtr() const
 	return m_buffer + rear_temp;
 }
 
-void RINGBUFFER::MoveFront(const int p_size)
+void C_RINGBUFFER::M_MoveFront(const int pa_size)
 {
 	int t_front = m_front;
-	t_front += p_size;
+	t_front += pa_size;
 	if (t_front >= BUFSIZE)
 		t_front -= BUFSIZE;
 
 	m_front = t_front;
 }
 
-void RINGBUFFER::MoveRear(const int p_size)
+void C_RINGBUFFER::M_MoveRear(const int pa_size)
 {
 	int t_rear = m_rear;
-	t_rear += p_size;
+	t_rear += pa_size;
 	if (t_rear >= BUFSIZE)
 		t_rear -= BUFSIZE;
 
 	m_rear = t_rear;
 }
 
-int RINGBUFFER::LinearRemainFrontSize()
+int C_RINGBUFFER::M_LinearRemainFrontSize()
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -267,7 +265,7 @@ int RINGBUFFER::LinearRemainFrontSize()
 	}
 }
 
-int RINGBUFFER::LinearRemainRearSize()
+int C_RINGBUFFER::M_LinearRemainRearSize()
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -280,12 +278,12 @@ int RINGBUFFER::LinearRemainRearSize()
 		return t_front - rear_temp;
 }
 
-void RINGBUFFER::RingBuffer_Lock()
+void C_RINGBUFFER::M_RingBuffer_Lock()
 {
 	AcquireSRWLockExclusive(&m_srw);
 }
 
-void RINGBUFFER::RingBuffer_Unlock()
+void C_RINGBUFFER::M_RingBuffer_Unlock()
 {
 	ReleaseSRWLockExclusive(&m_srw);
 }

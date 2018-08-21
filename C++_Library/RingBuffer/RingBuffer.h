@@ -5,7 +5,7 @@
 
 namespace Olbbemi
 {
-	class RINGBUFFER
+	class C_RINGBUFFER
 	{
 	private:
 		char *m_buffer;
@@ -13,28 +13,28 @@ namespace Olbbemi
 		SRWLOCK m_srw;
 
 	public:
-		RINGBUFFER();
-		~RINGBUFFER();
+		C_RINGBUFFER();
+		~C_RINGBUFFER();
 
-		bool Enqueue(char *p_data, const int p_size);
-		bool Dequeue(char *p_dest, const int p_size);
-		bool Peek(char *p_dest, const int p_size, int &p_return_size);
+		bool M_Enqueue(char *pa_data, const int pa_size);
+		bool M_Dequeue(char *p_dest, const int pa_size);
+		bool M_Peek(char *pa_dest, const int pa_size, int &pa_return_size);
 
-		int GetUseSize() const;
-		int GetUnuseSize() const;
+		int M_GetUseSize() const;
+		int M_GetUnuseSize() const;
 
-		char* GetBasicPtr() const;
-		char* GetFrontPtr() const;
-		char* GetRearPtr() const;
+		char* M_GetBasicPtr() const;
+		char* M_GetFrontPtr() const;
+		char* M_GetRearPtr() const;
 
-		void MoveFront(const int p_size);
-		void MoveRear(const int p_size);
+		void M_MoveFront(const int pa_size);
+		void M_MoveRear(const int pa_size);
 
-		int LinearRemainFrontSize();
-		int LinearRemainRearSize();
+		int M_LinearRemainFrontSize();
+		int M_LinearRemainRearSize();
 
-		void RingBuffer_Lock();
-		void RingBuffer_Unlock();
+		void M_RingBuffer_Lock();
+		void M_RingBuffer_Unlock();
 	};
 }
 
