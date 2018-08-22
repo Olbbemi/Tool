@@ -30,10 +30,10 @@ namespace Olbbemi
 	public:
 		C_LFQueue()
 		{
-		   /**--------------------------------------------
-			 * LFQueue Need Not More Alloc (new ST_Node X)
-			 *--------------------------------------------*/
-			m_pool = new C_MemoryPool<ST_Node>(4000, false);
+			/**--------------------------------------------
+			  * LFQueue Need Not More Alloc (new ST_Node X)
+			  *--------------------------------------------*/
+			m_pool = new C_MemoryPool<ST_Node>(1000, false);
 			m_use_count = 0;
 
 			m_front.block_info[0] = (LONG64)m_pool->M_Alloc();	m_front.block_info[1] = 1;
@@ -83,9 +83,7 @@ namespace Olbbemi
 
 				if (lo_front[0] == lo_rear[0] && ((ST_Node*)lo_rear[0])->link != nullptr)
 				{
-					if (InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear) == 1)
-						InterlockedIncrement64(&move_tail);
-					
+					InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear)
 					continue;
 				}
 
