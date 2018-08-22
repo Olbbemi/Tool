@@ -47,21 +47,18 @@ namespace Olbbemi
 
 		bool m_is_placementnew;
 		LONG m_use_count, m_alloc_count, m_max_alloc_count;
-	
 		HANDLE m_heap_handle;
 		__declspec(align(16)) ST_Top m_pool_top;
 
 		void M_Push(ST_Node* pa_new_node)
 		{
-			__declspec(align(16)) __int64 lo_top[2];
+			__int64 lo_top;
 
 			do
 			{
-				lo_top[0] = m_pool_top.block_info[0];
-				lo_top[1] = m_pool_top.block_info[1];
-
-				pa_new_node->next_node = (ST_Node*)lo_top[0];
-			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)pa_new_node, lo_top) == 0);
+				lo_top = m_pool_top.block_info[0];
+				pa_new_node->next_node = (ST_Node*)lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_pool_top.block_info[0], (LONG64)pa_new_node, lo_top) != lo_top);
 		}
 
 		T* M_Pop()
@@ -71,9 +68,9 @@ namespace Olbbemi
 
 			do
 			{
-				lo_top[0] = m_pool_top.block_info[0];
 				lo_top[1] = m_pool_top.block_info[1];
-
+				lo_top[0] = m_pool_top.block_info[0];
+				
 				if (lo_top[0] == 0)
 					return nullptr;
 
@@ -87,7 +84,7 @@ namespace Olbbemi
 		}
 
 	public:
-		C_MemoryPool(LONG pa_max_alloc_count = 0, bool pa_is_placement_new = false)
+		C_MemoryPool(int pa_max_alloc_count = 0, bool pa_is_placement_new = false)
 		{
 			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0); 
 			if (m_heap_handle == NULL)
@@ -118,7 +115,7 @@ namespace Olbbemi
 		virtual	~C_MemoryPool()
 		{
 			bool lo_destroy_check;
-			BOOL lo_free_check;
+			int lo_free_check;
 			ST_Node* lo_garbage;
 
 			while (m_pool_top.block_info[0] != 0)
@@ -188,12 +185,14 @@ namespace Olbbemi
 				return false;
 		}
 	
-	   /**--------------------------
-		 *  Return Total Alloc Node
-		 *--------------------------*/
-		LONG M_GetAllocCount() const
+		int	M_GetAllocCount() const // 메모리풀 내부의 전체 개수
 		{
 			return m_alloc_count;
+		}
+	
+		int	M_GetUseCount() const // 현재 사용중인 블럭 개수
+		{ 
+			return m_use_count;
 		}
 	};
 }

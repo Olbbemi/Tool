@@ -51,7 +51,8 @@ namespace Olbbemi
 			
 			while (1)
 			{
-				lo_rear[0] = m_rear.block_info[0];	lo_rear[1] = m_rear.block_info[1];
+				lo_rear[1] = m_rear.block_info[1];
+				lo_rear[0] = m_rear.block_info[0];	
 				if (((ST_Node*)lo_rear[0])->link == nullptr)
 				{
 					if (InterlockedCompareExchangePointer((PVOID*)&((ST_Node*)m_rear.block_info[0])->link, lo_new_node, nullptr) == nullptr)
@@ -74,8 +75,11 @@ namespace Olbbemi
 
 			while (1)
 			{
-				lo_front[0] = m_front.block_info[0];	lo_front[1] = m_front.block_info[1];
-				lo_rear[0] = m_rear.block_info[0];		lo_rear[1] = m_rear.block_info[1];
+				lo_front[1] = m_front.block_info[1];
+				lo_front[0] = m_front.block_info[0];
+
+				lo_rear[1] = m_rear.block_info[1];
+				lo_rear[0] = m_rear.block_info[0];		
 
 				if (lo_front[0] == lo_rear[0] && ((ST_Node*)lo_rear[0])->link != nullptr)
 				{

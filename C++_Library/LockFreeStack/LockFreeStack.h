@@ -8,6 +8,11 @@
 
 namespace Olbbemi
 {
+	/*
+	 * STL 에서 제공하는 stack 과 유사
+	 * Pop 시도할 때 Top 이 비어있으면 Log + Crash
+	 */
+
 	template<class T>
 	class C_LFStack
 	{
@@ -31,21 +36,22 @@ namespace Olbbemi
 		C_LFStack()
 		{
 			m_pool = new C_MemoryPool<ST_Node>(0, false);
-			m_top.block_info[0] = 0;	m_top.block_info[1] = 1;
+
+			m_top.block_info[0] = 0;	
+			m_top.block_info[1] = 1;
 		}
 
 		void M_Push(T pa_data)
 		{
-			__declspec(align(16))__int64 lo_top[2];
+			__int64 lo_top;
 			ST_Node* new_node = m_pool->M_Alloc();
 			new_node->data = pa_data;	new_node->link = nullptr;
 
 			do
 			{
-				lo_top[0] = m_top.block_info[0];	lo_top[1] = m_top.block_info[1];
-				
-				new_node->link = (ST_Node*)lo_top[0];
-			} while (InterlockedCompareExchange128(m_top.block_info, lo_top[1] + 1, (LONG64)new_node, lo_top) == 0);
+				lo_top = m_top.block_info[0];
+				new_node->link = (ST_Node*)lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_top.block_info, (LONG64)new_node, lo_top) != lo_top);
 
 			InterlockedIncrement(&m_use_count);
 		}
@@ -65,7 +71,8 @@ namespace Olbbemi
 
 			do
 			{
-				lo_top[0] = m_top.block_info[0];	lo_top[1] = m_top.block_info[1];
+				lo_top[1] = m_top.block_info[1];
+				lo_top[0] = m_top.block_info[0];	
 				
 				lo_next = ((ST_Node*)lo_top[0])->link;
 				lo_return_value = ((ST_Node*)(lo_top[0]))->data;
@@ -75,10 +82,21 @@ namespace Olbbemi
 			return lo_return_value;
 		}
 
-		LONG M_GetAllocCount() const
+		int M_GetAllocCount()
 		{
 			return m_pool->M_GetAllocCount();
 		}
+
+		//int M_GetUseCount()
+		//{
+		//	return m_pool->M_GetUseCount();
+		//}
+
+		int M_GetStacksize()
+		{
+			return m_use_count;
+		}
+
 	};
 }
 
