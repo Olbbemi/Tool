@@ -3,6 +3,8 @@
 
 #define UNICODE
 #define _UNICODE
+
+#define MAX_ARRAY 200
 #define CHECK_SUM 0x41
 #define INITIAL_HEAP_SIZE 1024 * 1024
 
@@ -195,5 +197,137 @@ namespace Olbbemi
 			return m_use_count;
 		}
 	};
+
+	template <class T>
+	class C_MemoryPoolTLS
+	{
+	private:
+		template <class T>
+		class C_Chunk
+		{
+		private:
+			struct ST_Node
+			{
+				T data;
+				WORD alloc_index;
+				C_Chunk<T>* chunk_ptr;
+			};
+
+			volatile LONG m_free_count;
+			ST_Node m_node[MAX_ARRAY];
+			LONG m_index;
+
+		public:
+			C_Chunk()
+			{
+				m_free_count = MAX_ARRAY;
+				for (int i = 0; i < MAX_ARRAY; i++)
+				{
+					m_node[i].alloc_index = i;
+					m_node[i].chunk_ptr = this;
+				}
+			}
+
+			T* M_Chunk_Alloc(bool& pa_is_finish)
+			{
+				T* lo_return_value = &(m_node[m_index].data);
+
+				m_index++;
+				if (m_index == MAX_ARRAY)
+					pa_is_finish = true;
+				else
+					pa_is_finish = false;
+
+				return lo_return_value;
+			}
+		};
+
+		DWORD m_tls_index;
+		C_MemoryPool<C_Chunk<T>>* m_chunkpool;
+
+	public:
+		C_MemoryPoolTLS(bool pa_is_placement_new = false)
+		{
+			m_tls_index = TlsAlloc();
+			if (m_tls_index == TLS_OUT_OF_INDEXES)
+			{
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				ST_Log lo_log({ "TlsAlloc Error Code: " + to_string(GetLastError()) });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+			}
+
+			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(0, pa_is_placement_new);
+		}
+
+		T* M_Alloc()
+		{
+			bool lo_is_finish = false;
+			void* lo_tls_ptr = nullptr;
+			T* lo_return_value = nullptr;
+
+			lo_tls_ptr = TlsGetValue(m_tls_index);
+			if (lo_tls_ptr == nullptr)
+			{
+				int lo_error = GetLastError();
+				if (lo_error != 0)
+				{
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					ST_Log lo_log({ "TlsGetValue Error Code: " + to_string(GetLastError()) });
+					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+				}
+
+				lo_tls_ptr = (void*)(m_chunkpool->M_Alloc());
+				BOOL lo_check = TlsSetValue(m_tls_index, lo_tls_ptr);
+				if (lo_check == 0)
+				{
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
+					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+				}
+			}
+
+			lo_return_value = ((C_Chunk<T>*)lo_tls_ptr)->M_Chunk_Alloc(lo_is_finish);
+			if (lo_is_finish == true)
+			{
+				BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
+				if (lo_check == 0)
+				{
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
+					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+				}
+			}
+
+			return lo_return_value;
+		}
+
+		void M_Free(T* pa_node)
+		{
+			/*
+			 * (char*)pa_node + 16 -> 해당 노드의 배열 인덱스 번호
+			 * (char*)pa_node + 24 -> 해당 노드가 속한 Chunk 의 시작 주소
+			 * (char*)pa_node + 32 -> 각 Chunk의 RefCount
+			 */
+
+			LONG lo_interlock_value = InterlockedDecrement((LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 32 + 8)));
+			if (lo_interlock_value == 0)
+			{
+				*((LONG64*)((char*)pa_node + 32)) = 0;
+				*(LONG64*)((LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 32 + 8))) = MAX_ARRAY;
+				m_chunkpool->M_Free((C_Chunk<T>*)(*((LONG64*)((char*)pa_node + 24))));
+			}
+		}
+
+		int M_UseChunkCount()
+		{
+			return m_chunkpool->M_GetUseCount();
+		}
+
+		int M_AllocCount()
+		{
+			return m_chunkpool->M_GetAllocCount();
+		}
+	};
 }
+
 #endif
