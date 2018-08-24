@@ -8,11 +8,8 @@
 
 namespace Olbbemi
 {
-   /*
-	*
-	* 직렬화 버퍼는 항상 메모리풀에서만 사용 [ Option: placement new = false ] -> 버퍼의 생성과 삭제는 초기 생성자 호출 한번과 마지막 소멸자 호출 한번에서만 발생
-	* 현재 입력되는 직렬화 버퍼의 공간이 부족하면 자동으로 Resize
-	* 항상 InputHeaderSize 함수로 초기화
+  
+	/*
 	*/
 
 	template<class T>
@@ -72,8 +69,12 @@ namespace Olbbemi
 			m_ref_count = pa_instance.m_ref_count;
 			return *this;
 		}
-
 	};
+
+	/*
+	 *
+	 *
+	 */
 
 	class C_Serialize
 	{
