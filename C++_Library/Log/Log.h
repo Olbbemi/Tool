@@ -21,6 +21,9 @@ using namespace std;
  *  5. 바이너리 로그를 남길 경우 _BinaryLOG 매크로를 호출 [ Action: 매크로를 호출하는 cpp 파일명, Server: 매크로를 호출하는 서버 종류, Size: 바이너리 크기 ]
  */
 
+ /**--------------------------
+ *
+ *--------------------------*/
 struct ST_Log
 {
 	int count;

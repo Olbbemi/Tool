@@ -33,7 +33,7 @@ int C_RINGBUFFER::M_GetUseSize() const
 	int t_front = m_front, t_rear = m_rear;
 
 	if (t_front > t_rear)
-		return BUFSIZE - (t_front - t_rear);	// (BUFSIZE - 1) - (front - rear) + 1; 
+		return BUFSIZE - (t_front - t_rear); // (BUFSIZE - 1) - (front - rear) + 1; 
 	else
 		return t_rear - t_front;
 }
@@ -247,6 +247,9 @@ void C_RINGBUFFER::M_MoveRear(const int pa_size)
 	m_rear = t_rear;
 }
 
+/**--------------------
+  * 원형 큐에서 끊어지지 않고 한번에 얻을 수 있는 사용중인 크기를 얻는 함수
+  *--------------------*/
 int C_RINGBUFFER::M_LinearRemainFrontSize()
 {
 	int t_front = m_front, t_rear = m_rear;
@@ -265,6 +268,9 @@ int C_RINGBUFFER::M_LinearRemainFrontSize()
 	}
 }
 
+/**--------------------
+  * 원형 큐에서 끊어지지 않고 한번에 얻을 수 있는 사용중이지 않은 크기를 얻는 함수
+  *--------------------*/
 int C_RINGBUFFER::M_LinearRemainRearSize()
 {
 	int t_front = m_front, t_rear = m_rear;

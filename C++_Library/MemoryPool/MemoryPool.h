@@ -16,19 +16,21 @@
 #include <Windows.h>
 #include <strsafe.h>
 
+#include <string>
+#include <typeinfo>
+using namespace std;
+
 namespace Olbbemi
 {
-   /*
-	* 메모리 풀은 기본 힙을 사용하지 않음 ( HeapCreate, HeapAlloc, HeapFree, HeapDestroy 이용 )
-	* placement new : new 연산자에서 제공하는 3가지 성질 [ 1.동적할당, 2.객체에 대하여 생성자 호출, 3.가상테이블 생성 ] 중 2, 3번을 수행하는 연산자
-	* MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 false : NODE 생성 시 최초에 한번만 생성자호출 및 소멸자 호출 [ malloc 으로 할당하고 placement_new 호출, 소멸자 직접 호출 ]
-	* MemoryPool 의 생성자 매개변수에 p_is_placement_new 가 true :  NODE 생성 시에는 malloc으로 할당, 외부에서 Alloc 및 Free 함수를 호출할 때마다 placement_new 이용하여 생성자 및 소멸자 호출 ]
-	*/
-
 	template <class T>
 	class C_MemoryPool
 	{
 	private:
+
+		/**------------------------------------------------------------------------
+		  * 메모리 풀에서 사용할 노드
+		  * 각 노드마다 CheckSum 이 있어 노드 반환 시 포인터 연산을 통해 CheckSum 확인
+		  *------------------------------------------------------------------------*/
 		struct ST_Node
 		{
 			ST_Node* next_node;
@@ -42,6 +44,10 @@ namespace Olbbemi
 			}
 		};
 
+		/**---------------------------------------------------------------
+		  * 메모리 풀에서 노드를 할당하고 반환 받는 방법도 락프리 스택을 이용
+		  * [0]: Node Address, [1]: Unique Index
+		  *---------------------------------------------------------------*/
 		struct ST_Top
 		{
 			volatile __int64 block_info[2];
@@ -86,6 +92,13 @@ namespace Olbbemi
 		}
 
 	public:
+
+		/**-----------------------------------------------------------------------------------------------------------
+		  * 메모리 풀에서 사용하는 노드는 디폴트 힙이 아닌 HeapCreate 를 통해 별도의 힙을 할당 받아 사용
+		  * max_alloc_count 가 0이 아니면 생성자에서 해당 수치만큼 노드를 생성하여 저장
+		  * placement_new 가 false 이면 각 노드가 생성될 때 한번만 노드 생성자 호출, 소멸할 때 소멸자 호출
+		  * placement_new 가 true 이면 Alloc 함수 호출될 때마다 노드 생성자 호출, Free 함수 호출될 떄마다 노드 소멸자 호출 
+		  *-----------------------------------------------------------------------------------------------------------*/
 		C_MemoryPool(int pa_max_alloc_count = 0, bool pa_is_placement_new = false)
 		{
 			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0); 
@@ -114,6 +127,10 @@ namespace Olbbemi
 			}
 		}
 
+		/**----------------------------------------------------------------------------------
+		  * 메모리 풀에서 사용하고 있는 모든 노드를 HeapFree 함수를 통해 삭제 및 사용 카운트 감소
+		  *  placement_new 가 false 이면 각 노드의 소멸자 호출
+		  *----------------------------------------------------------------------------------*/
 		virtual	~C_MemoryPool()
 		{
 			bool lo_destroy_check;
@@ -147,6 +164,11 @@ namespace Olbbemi
 			}
 		}
 
+		/**---------------------------------------------------------------------------------------------------------
+		  * 메모리 풀에 노드가 존재한다면 존재하는 노드를 반환, 존재하지 않는다면 HeapAlloc 함수를 통해 새로 할당받아 반환
+		  * placement_new 가 false 이면 HeapAlloc 함수를 통해 새로 할당받을 때만 노드의 생성자 호출
+		  * placement_new 가 true 이면 M_Pop 함수에서 반환하기전 노드의 생성자 호출
+		  *---------------------------------------------------------------------------------------------------------*/
 		T* M_Alloc()
 		{
 			T* return_value;
@@ -172,7 +194,11 @@ namespace Olbbemi
 			return return_value;
 		}
 
-		bool M_Free(T* pData)
+		/**------------------------------------------------------------------------------------------------------
+		  * 반환받은 데이터를 이용하여 포인터연산을 통해 CheckSum 확인, 실패했다면 할당한 데이터타입이 아닌 인자를 받음
+		  * placement_new 가 true 이면 반환받을 때마다 해당 노드의 소멸자 호출
+		  *------------------------------------------------------------------------------------------------------*/
+		void M_Free(T* pData)
 		{
 			if (*((char*)pData + sizeof(T)) == CHECK_SUM)
 			{
@@ -181,10 +207,15 @@ namespace Olbbemi
 
 				InterlockedDecrement(&m_use_count);
 				M_Push((ST_Node*)((char*)pData - sizeof(T*)));
-				return true;
 			}
 			else
-				return false;
+			{
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				string lo_template_type = typeid(T).name(), lo_param_type = typeid(pData).name();
+
+				ST_Log lo_log({ "Free Type Error -> TemplateType: " + lo_template_type + " ParamType: " + lo_param_type });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+			}
 		}
 	
 		int	M_GetAllocCount() const // 메모리풀 내부의 전체 개수
@@ -206,11 +237,16 @@ namespace Olbbemi
 		class C_Chunk
 		{
 		private:
+
+			/**---------------------------------------------------------------
+			  * 각 Chunk 마다 가질 노드 ( 배열 형태로 존재 )
+			  * data: TLSPool의 Alloc 함수 호출 시 반환될 데이터를 저장하는 변수
+			  * alloc_index: TLSPool의 Free 함수에서 포인터 연산으로 사용될 변수
+			  *---------------------------------------------------------------*/
 			struct ST_Node
 			{
 				T data;
 				WORD alloc_index;
-				C_Chunk<T>* chunk_ptr;
 			};
 
 			volatile LONG m_free_count;
@@ -218,14 +254,12 @@ namespace Olbbemi
 			LONG m_index;
 
 		public:
+
 			C_Chunk()
 			{
 				m_free_count = MAX_ARRAY;
 				for (int i = 0; i < MAX_ARRAY; i++)
-				{
 					m_node[i].alloc_index = i;
-					m_node[i].chunk_ptr = this;
-				}
 			}
 
 			T* M_Chunk_Alloc(bool& pa_is_finish)
@@ -246,6 +280,11 @@ namespace Olbbemi
 		C_MemoryPool<C_Chunk<T>>* m_chunkpool;
 
 	public:
+
+		/**----------------------------------------------
+		  * TlsAlloc 함수를 통해 사용가능한 인덱스를 얻어옴
+		  * 메모리 풀은 Chunk 를 관리
+		  *----------------------------------------------*/
 		C_MemoryPoolTLS(bool pa_is_placement_new = false)
 		{
 			m_tls_index = TlsAlloc();
@@ -259,6 +298,11 @@ namespace Olbbemi
 			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(0, pa_is_placement_new);
 		}
 
+		/**-----------------------------------------------------------------------------------------------------------------------
+		  * 현재 할당받은 TLS 가 비어 있다면 메모리 풀을 이용하여 Chunk 주소를 얻어와 저장 
+		  * TLS 내부에는 Chunk 주소가 저장되어 있고 각 Chunk 내부에는 반환될 데이터가 저장되어 있음
+		  * Alloc 함수가 호출될 때마다 Chunk 내부의 데이터를 반환하고 해당 Chunk에서 할당할 수 있는 데이터가 모두 소진된 경우 TLS를 비움 
+		  *-----------------------------------------------------------------------------------------------------------------------*/
 		T* M_Alloc()
 		{
 			bool lo_is_finish = false;
@@ -286,7 +330,7 @@ namespace Olbbemi
 				}
 			}
 
-			lo_return_value = ((C_Chunk<T>*)lo_tls_ptr)->M_Chunk_Alloc(lo_is_finish);
+			lo_return_value = ((C_Chunk<T>*)lo_tls_ptr)->M_Chunk_Alloc(lo_is_finish); // Chunk_Alloc 함수가 하는 기능을 함수콜대신에 직접처리하도록 변경
 			if (lo_is_finish == true)
 			{
 				BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
@@ -301,20 +345,25 @@ namespace Olbbemi
 			return lo_return_value;
 		}
 
+		/**----------------------------------------------------------------------------------------------------------------
+		  * 반환 받은 데이터를 이용하여 포인터연산 후 각 Chunk의 Free_count를 증가시킴
+		  * 해당 Chunk 에서 할당한 모든 노드가 반환 ( Free_count 가 배열 크기랑 동일한 경우 ) 되면 해당 Chunk를 메모리 풀에 반환
+		  * (char*)pa_node + 16 -> 해당 노드의 배열 인덱스 번호
+		  * (char*)pa_node + 24 -> 해당 노드가 속한 Chunk 의 m_index 변수
+		  *----------------------------------------------------------------------------------------------------------------*/
 		void M_Free(T* pa_node)
 		{
-			/*
-			 * (char*)pa_node + 16 -> 해당 노드의 배열 인덱스 번호
-			 * (char*)pa_node + 24 -> 해당 노드가 속한 Chunk 의 시작 주소
-			 * (char*)pa_node + 32 -> 각 Chunk의 RefCount
-			 */
+			LONG *lo_chunk_value, lo_interlock_value;
 
-			LONG lo_interlock_value = InterlockedDecrement((LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 32 + 8)));
+			lo_chunk_value = (LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 24 + 8)); // 각 Chunk 객체의 시작 주소이자 Free_count 변수의 시작 주소
+			lo_interlock_value = InterlockedDecrement(lo_chunk_value);
+
 			if (lo_interlock_value == 0)
 			{
-				*((LONG64*)((char*)pa_node + 32)) = 0;
-				*(LONG64*)((LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 32 + 8))) = MAX_ARRAY;
-				m_chunkpool->M_Free((C_Chunk<T>*)(*((LONG64*)((char*)pa_node + 24))));
+				*lo_chunk_value = MAX_ARRAY;
+				*((LONG64*)((char*)pa_node + 24)) = 0;
+
+				m_chunkpool->M_Free((C_Chunk<T>*)lo_chunk_value);
 			}
 		}
 
