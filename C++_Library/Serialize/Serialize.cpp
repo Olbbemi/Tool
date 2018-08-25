@@ -6,7 +6,7 @@
 #include <string.h>
 using namespace Olbbemi;
 
-C_MemoryPool<C_Serialize> C_Serialize::s_memory_pool(10, false);
+C_MemoryPoolTLS<C_Serialize> C_Serialize::s_memory_pool(false);
 
 C_Serialize* C_Serialize::S_Alloc()
 {

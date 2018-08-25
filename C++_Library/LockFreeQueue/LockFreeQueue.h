@@ -33,7 +33,7 @@ namespace Olbbemi
 			volatile LONG64 block_info[2];
 		};
 
-		volatile LONG64 m_use_count;
+		volatile LONG64 m_queue_size;
 		__declspec(align(16)) ST_Ptr m_front, m_rear;
 		C_MemoryPool<ST_Node> *m_pool;
 
@@ -54,7 +54,7 @@ namespace Olbbemi
 			m_rear.block_info[1] = 1;
 
 			((ST_Node*)m_front.block_info[0])->link = nullptr;
-			m_use_count = 0;
+			m_queue_size = 0;
 		}
 
 		/**-------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -69,10 +69,10 @@ namespace Olbbemi
 				lo_garbage = (ST_Node*)m_front.block_info[0];
 				m_front.block_info[0] = (LONG64)(((ST_Node*)m_front.block_info[0])->link);
 				m_pool->M_Free(lo_garbage);
-				m_use_count--;
+				m_queue_size--;
 			}
 
-			m_rear[0] = 0;
+			m_rear.block_info[0] = 0;
 			delete m_pool;
 		}
 
@@ -95,13 +95,13 @@ namespace Olbbemi
 				{
 					if (InterlockedCompareExchangePointer((PVOID*)&((ST_Node*)m_rear.block_info[0])->link, lo_new_node, nullptr) == nullptr)
 					{
-						InterlockedIncrement64(&m_use_count);
-						InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)lo_new_node, lo_rear)
+						InterlockedIncrement64(&m_queue_size);
+						InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)lo_new_node, lo_rear);
 						break;
 					}
 				}
 				else
-					InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear)
+					InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear);
 			}
 		}
 
@@ -125,13 +125,13 @@ namespace Olbbemi
 
 				if (lo_front[0] == lo_rear[0] && ((ST_Node*)lo_rear[0])->link != nullptr)
 				{
-					InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear)
+					InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)(((ST_Node*)lo_rear[0])->link), lo_rear);
 					continue;
 				}
 
 				if (m_front.block_info[0] == 0)
 				{
-					if(m_use_count != 0)
+					if(m_queue_size != 0)
 						continue;
 					else
 					{
@@ -148,7 +148,7 @@ namespace Olbbemi
 				pa_return_value = lo_next->data;
 				if (InterlockedCompareExchange128(m_front.block_info, lo_front[1] + 1, (LONG64)(((ST_Node*)lo_front[0])->link), lo_front) == 1)
 				{
-					InterlockedDecrement64(&m_use_count);
+					InterlockedDecrement64(&m_queue_size);
 
 					m_pool->M_Free((ST_Node*)lo_front[0]);	
 					break;
@@ -160,6 +160,12 @@ namespace Olbbemi
 		{
 			return m_pool->M_GetAllocCount();
 		}
+
+		LONG M_GetUseCount()
+		{
+			return m_queue_size;
+		}
+
 	};
 }
 

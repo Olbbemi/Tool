@@ -10,6 +10,7 @@ BYTE C_Log::m_log_level = LOG_LEVEL_DEBUG;
 TCHAR C_Log::m_dir_path[50];
 SRWLOCK C_Log::m_log_srwLock; SRWLOCK C_Log::m_binary_log_srwLock;
 
+C_Dump g_dump;
 volatile LONGLONG C_Log::m_count = 0;
 
 C_Log::C_Log()
@@ -81,6 +82,9 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 	
 	fclose(input);
 	ReleaseSRWLockExclusive(&m_log_srwLock);
+
+	if (pa_log_level == LOG_LEVEL_SYSTEM)
+		g_dump.S_MakeCrash();
 }
 
 void C_Log::S_BinaryLog(int pa_line, TCHAR* pa_action, TCHAR* pa_server, char* pa_str, int pa_size)

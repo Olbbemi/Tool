@@ -246,20 +246,21 @@ namespace Olbbemi
 			struct ST_Node
 			{
 				T data;
-				WORD alloc_index;
+				C_Chunk* chunk_ptr;
 			};
 
 			volatile LONG m_free_count;
 			ST_Node m_node[MAX_ARRAY];
 			LONG m_index;
 
+			template <class T> friend class C_MemoryPoolTLS;
 		public:
 
 			C_Chunk()
 			{
 				m_free_count = MAX_ARRAY;
 				for (int i = 0; i < MAX_ARRAY; i++)
-					m_node[i].alloc_index = i;
+					m_node[i].chunk_ptr = this;
 			}
 
 			T* M_Chunk_Alloc(bool& pa_is_finish)
@@ -330,8 +331,8 @@ namespace Olbbemi
 				}
 			}
 
-			lo_return_value = ((C_Chunk<T>*)lo_tls_ptr)->M_Chunk_Alloc(lo_is_finish); // Chunk_Alloc 함수가 하는 기능을 함수콜대신에 직접처리하도록 변경
-			if (lo_is_finish == true)
+			lo_return_value = &(((C_Chunk<T>*)lo_tls_ptr)->m_node[((C_Chunk<T>*)lo_tls_ptr)->m_index++].data);
+			if (((C_Chunk<T>*)lo_tls_ptr)->m_index == MAX_ARRAY)
 			{
 				BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
 				if (lo_check == 0)
@@ -348,31 +349,28 @@ namespace Olbbemi
 		/**----------------------------------------------------------------------------------------------------------------
 		  * 반환 받은 데이터를 이용하여 포인터연산 후 각 Chunk의 Free_count를 증가시킴
 		  * 해당 Chunk 에서 할당한 모든 노드가 반환 ( Free_count 가 배열 크기랑 동일한 경우 ) 되면 해당 Chunk를 메모리 풀에 반환
-		  * (char*)pa_node + 16 -> 해당 노드의 배열 인덱스 번호
-		  * (char*)pa_node + 24 -> 해당 노드가 속한 Chunk 의 m_index 변수
+		  * (char*)pa_node + sizeof(T) 위치에는 해당 노드가 위치하는 Chunk 시작주소를 저장
 		  *----------------------------------------------------------------------------------------------------------------*/
 		void M_Free(T* pa_node)
 		{
-			LONG *lo_chunk_value, lo_interlock_value;
+			LONG lo_interlock_value;
+			C_Chunk<T>* lo_chunk_ptr = (C_Chunk<T>*)(*((LONG64*)((char*)pa_node + sizeof(T))));
 
-			lo_chunk_value = (LONG*)((char*)pa_node - (*((WORD*)((char*)pa_node + 16)) * 24 + 8)); // 각 Chunk 객체의 시작 주소이자 Free_count 변수의 시작 주소
-			lo_interlock_value = InterlockedDecrement(lo_chunk_value);
-
+			lo_interlock_value = InterlockedDecrement(&(lo_chunk_ptr->m_free_count));
 			if (lo_interlock_value == 0)
 			{
-				*lo_chunk_value = MAX_ARRAY;
-				*((LONG64*)((char*)pa_node + 24)) = 0;
-
-				m_chunkpool->M_Free((C_Chunk<T>*)lo_chunk_value);
+				lo_chunk_ptr->m_free_count = MAX_ARRAY;
+				lo_chunk_ptr->m_index = 0;
+				m_chunkpool->M_Free(lo_chunk_ptr);
 			}
 		}
 
-		int M_UseChunkCount()
+		LONG M_UseChunkCount()
 		{
 			return m_chunkpool->M_GetUseCount();
 		}
 
-		int M_AllocCount()
+		LONG M_AllocCount()
 		{
 			return m_chunkpool->M_GetAllocCount();
 		}

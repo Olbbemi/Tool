@@ -33,7 +33,7 @@ namespace Olbbemi
 			volatile LONG64 block_info[2];
 		};
 
-		volatile LONG m_use_count;
+		volatile LONG m_stack_size;
 		__declspec(align(16)) ST_Top m_top;
 		C_MemoryPool<ST_Node> *m_pool;
 
@@ -56,7 +56,7 @@ namespace Olbbemi
 			ST_Node* lo_garbage;
 			while (m_top.block_info[0] != 0)
 			{
-				m_use_count--;
+				m_stack_size--;
 				lo_garbage = (ST_Node*)m_top.block_info[0];
 				m_top.block_info[0] = (LONG64)(((ST_Node*)m_top.block_info[0])->link);
 				m_pool->M_Free(lo_garbage);
@@ -80,7 +80,7 @@ namespace Olbbemi
 				new_node->link = (ST_Node*)lo_top;
 			} while (InterlockedCompareExchange64((LONG64*)&m_top.block_info, (LONG64)new_node, lo_top) != lo_top);
 
-			InterlockedIncrement(&m_use_count);
+			InterlockedIncrement(&m_stack_size);
 		}
 
 		/**-----------------------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ namespace Olbbemi
 		  *-----------------------------------------------------------------------------------------------*/
 		T M_Pop()
 		{
-			if (InterlockedDecrement(&m_use_count) < 0)
+			if (InterlockedDecrement(&m_stack_size) < 0)
 			{
 				TCHAR lo_action[] = _TEXT("LFStack"), lo_server[] = _TEXT("NONE");
 				ST_Log lo_log({ "LFStack is Null" });
@@ -117,6 +117,12 @@ namespace Olbbemi
 		{
 			return m_pool->M_GetAllocCount();
 		}
+
+		LONG M_GetUseCount()
+		{
+			return m_stack_size;
+		}
+
 	};
 }
 
