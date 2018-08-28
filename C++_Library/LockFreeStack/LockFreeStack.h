@@ -104,10 +104,9 @@ namespace Olbbemi
 			{
 				lo_top[1] = m_top.block_info[1];
 				lo_top[0] = m_top.block_info[0];
-				
-				lo_next = ((ST_Node*)lo_top[0])->link;
+
 				lo_return_value = ((ST_Node*)(lo_top[0]))->data;
-			} while (InterlockedCompareExchange128(m_top.block_info, lo_top[1] + 1, (LONG64)lo_next, lo_top) == 0);
+			} while (InterlockedCompareExchange128(m_top.block_info, lo_top[1] + 1, (LONG64)((ST_Node*)lo_top[0])->link, lo_top) == 0);
 
 			m_pool->M_Free((ST_Node*)lo_top[0]);
 			return lo_return_value;
@@ -122,7 +121,6 @@ namespace Olbbemi
 		{
 			return m_stack_size;
 		}
-
 	};
 }
 

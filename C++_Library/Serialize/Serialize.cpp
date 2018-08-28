@@ -27,6 +27,21 @@ void C_Serialize::S_AddReference(C_Serialize* pa_serialQ)
 	InterlockedIncrement(&pa_serialQ->m_ref_count);
 }
 
+LONG C_Serialize::S_TLSAllocCount()
+{
+	return s_memory_pool.M_AllocCount();
+}
+
+LONG C_Serialize::S_TLSChunkCount()
+{
+	return s_memory_pool.M_UseChunkCount();
+}
+
+LONG C_Serialize::S_TLSNodeCount()
+{
+	return s_memory_pool.M_UseNodeCount();
+}
+
 C_Serialize::C_Serialize()
 {
 	m_front = m_rear = 0;

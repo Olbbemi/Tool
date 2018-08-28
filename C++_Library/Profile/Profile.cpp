@@ -68,8 +68,8 @@ void C_Profile::M_Save()
 
 		for (int i = 0; i < lo_thread_count; i++)
 		{
-			_ftprintf_s(lo_output, _TEXT("  -----------------------------------------------------------------------------------------------------------------------\n"));
-			_ftprintf_s(lo_output, _TEXT("#     ThreadID    #            Name            #       Average       #       Min_Value       #       Max_Value       #       Count       #\n"));
+			_ftprintf_s(lo_output, _TEXT("  -------------------------------------------------------------------------------------------------------------------------------------------------------------\n"));
+			_ftprintf_s(lo_output, _TEXT("#     ThreadID    #                        Name                         #       Average       #       Min_Value       #       Max_Value       #       Count       #\n"));
 
 			for (auto p = s_chunk[i]->m_node_list.begin(); p != s_chunk[i]->m_node_list.end(); p++)
 			{
@@ -99,10 +99,10 @@ void C_Profile::M_Save()
 				}
 				(*p)->m_call_count -= ((*p)->m_min_count - 1);
 
-				_ftprintf_s(lo_output, _TEXT("#%d#%30s#%22.4Lf#%24.4Lf#%24.4Lf#%18lld#\n"), s_chunk[i]->m_thread_id, (*p)->m_function_name, ((long double)(*p)->m_total_time / (long double)(*p)->m_call_count / (long double)m_frequency.QuadPart * MICRO), ((long double)MinValue / (long double)m_frequency.QuadPart * MICRO), ((long double)MaxValue / (long double)m_frequency.QuadPart * MICRO), (*p)->m_call_count);
+				_ftprintf_s(lo_output, _TEXT("#%12d      #%50s#%22.4Lf#%24.4Lf#%24.4Lf#%18lld#\n"), s_chunk[i]->m_thread_id, (*p)->m_function_name, ((long double)(*p)->m_total_time / (long double)(*p)->m_call_count / (long double)m_frequency.QuadPart * MICRO), ((long double)MinValue / (long double)m_frequency.QuadPart * MICRO), ((long double)MaxValue / (long double)m_frequency.QuadPart * MICRO), (*p)->m_call_count);
 			}
 
-			_ftprintf_s(lo_output, _TEXT("  -----------------------------------------------------------------------------------------------------------------------\n"));
+			_ftprintf_s(lo_output, _TEXT("  -------------------------------------------------------------------------------------------------------------------------------------------------------------\n"));
 		}
 
 		fclose(lo_output);

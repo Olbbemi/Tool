@@ -4,7 +4,7 @@
 #define UNICODE
 #define _UNICODE
 
-#define MAX_ARRAY 200
+#define MAX_ARRAY 1000
 #define CHECK_SUM 0x41
 #define INITIAL_HEAP_SIZE 1024 * 1024
 
@@ -113,9 +113,9 @@ namespace Olbbemi
 			m_use_count = 0;							m_alloc_count = 0;
 			m_pool_top.block_info[0] = 0;				m_pool_top.block_info[1] = 1;
 
-			if (m_max_alloc_count != 0)
+			if (pa_max_alloc_count != 0)
 			{
-				for (int i = 0; i < m_max_alloc_count; i++)
+				for (int i = 0; i < pa_max_alloc_count; i++)
 				{
 					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
 					if (m_is_placementnew == false)
@@ -262,21 +262,9 @@ namespace Olbbemi
 				for (int i = 0; i < MAX_ARRAY; i++)
 					m_node[i].chunk_ptr = this;
 			}
-
-			T* M_Chunk_Alloc(bool& pa_is_finish)
-			{
-				T* lo_return_value = &(m_node[m_index].data);
-
-				m_index++;
-				if (m_index == MAX_ARRAY)
-					pa_is_finish = true;
-				else
-					pa_is_finish = false;
-
-				return lo_return_value;
-			}
 		};
 
+		volatile LONG v_node_count;
 		DWORD m_tls_index;
 		C_MemoryPool<C_Chunk<T>>* m_chunkpool;
 
@@ -296,7 +284,8 @@ namespace Olbbemi
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
-			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(0, pa_is_placement_new);
+			v_node_count = 0;
+			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(10, pa_is_placement_new);
 		}
 
 		/**-----------------------------------------------------------------------------------------------------------------------
@@ -331,8 +320,11 @@ namespace Olbbemi
 				}
 			}
 
-			lo_return_value = &(((C_Chunk<T>*)lo_tls_ptr)->m_node[((C_Chunk<T>*)lo_tls_ptr)->m_index++].data);
-			if (((C_Chunk<T>*)lo_tls_ptr)->m_index == MAX_ARRAY)
+			LONG lo_index = ((C_Chunk<T>*)lo_tls_ptr)->m_index++;
+			lo_return_value = &(((C_Chunk<T>*)lo_tls_ptr)->m_node[lo_index].data);
+			InterlockedIncrement(&v_node_count);
+
+			if (lo_index + 1 == MAX_ARRAY)
 			{
 				BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
 				if (lo_check == 0)
@@ -356,6 +348,7 @@ namespace Olbbemi
 			LONG lo_interlock_value;
 			C_Chunk<T>* lo_chunk_ptr = (C_Chunk<T>*)(*((LONG64*)((char*)pa_node + sizeof(T))));
 
+			InterlockedDecrement(&v_node_count);
 			lo_interlock_value = InterlockedDecrement(&(lo_chunk_ptr->m_free_count));
 			if (lo_interlock_value == 0)
 			{
@@ -363,6 +356,11 @@ namespace Olbbemi
 				lo_chunk_ptr->m_index = 0;
 				m_chunkpool->M_Free(lo_chunk_ptr);
 			}
+		}
+
+		LONG M_UseNodeCount()
+		{
+			return v_node_count;
 		}
 
 		LONG M_UseChunkCount()
