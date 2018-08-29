@@ -1,6 +1,5 @@
 #include "Precompile.h"
 #include "Profile.h"
-
 #include "Log/Log.h"
 
 #include <time.h>
@@ -10,13 +9,21 @@
 using namespace Olbbemi;
 
 LONG C_Profile::s_index = 0;
-DWORD C_Profile_Chunk::s_tls_index = 0;
+DWORD C_Profile::s_tls_index = 0;
 C_Profile_Chunk** C_Profile::s_chunk = nullptr;
 
 C_Profile::C_Profile(int pa_thread_count) : m_is_lock_on(true), m_file(_TEXT("Profile_"))
 {
 	s_index = -1;	m_thread_count = pa_thread_count;
 	QueryPerformanceFrequency(&m_frequency);
+
+	s_tls_index = TlsAlloc();
+	if (s_tls_index == TLS_OUT_OF_INDEXES)
+	{
+		TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("NONE");
+		ST_Log lo_log({ "TlsAlloc Error Code: " + to_string(GetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+	}
 
 	s_chunk = new C_Profile_Chunk*[pa_thread_count];
 
@@ -68,9 +75,9 @@ void C_Profile::M_Save()
 
 		for (int i = 0; i < lo_thread_count; i++)
 		{
-			_ftprintf_s(lo_output, _TEXT("  -------------------------------------------------------------------------------------------------------------------------------------------------------------\n"));
-			_ftprintf_s(lo_output, _TEXT("#     ThreadID    #                        Name                         #       Average       #       Min_Value       #       Max_Value       #       Count       #\n"));
-
+			_ftprintf_s(lo_output, _TEXT("ThreadID: %d\n"), s_chunk[i]->m_thread_id);
+			_ftprintf_s(lo_output, _TEXT("                       Name  |             Average  |                 Min  |                 Max  |    Call  \n"));
+			_ftprintf_s(lo_output, _TEXT("-----------------------------|----------------------|----------------------|----------------------|----------\n"));
 			for (auto p = s_chunk[i]->m_node_list.begin(); p != s_chunk[i]->m_node_list.end(); p++)
 			{
 				__int64 MaxValue = (*p)->m_max_value[0], MinValue = (*p)->m_min_value[0];
@@ -99,10 +106,10 @@ void C_Profile::M_Save()
 				}
 				(*p)->m_call_count -= ((*p)->m_min_count - 1);
 
-				_ftprintf_s(lo_output, _TEXT("#%12d      #%50s#%22.4Lf#%24.4Lf#%24.4Lf#%18lld#\n"), s_chunk[i]->m_thread_id, (*p)->m_function_name, ((long double)(*p)->m_total_time / (long double)(*p)->m_call_count / (long double)m_frequency.QuadPart * MICRO), ((long double)MinValue / (long double)m_frequency.QuadPart * MICRO), ((long double)MaxValue / (long double)m_frequency.QuadPart * MICRO), (*p)->m_call_count);
+				_ftprintf_s(lo_output, _TEXT("%29s|%20f§Á|%20f§Á|%20f§Á|%10lld\n"), (*p)->m_function_name, (((long double)(*p)->m_total_time / (long double)(*p)->m_call_count * MICRO) / (long double)m_frequency.QuadPart), ((long double)MinValue * MICRO / (long double)m_frequency.QuadPart), ((long double)MaxValue * MICRO / (long double)m_frequency.QuadPart), (*p)->m_call_count);
 			}
+			_ftprintf_s(lo_output, _TEXT("-----------------------------|----------------------|----------------------|----------------------|----------\n\n"));
 
-			_ftprintf_s(lo_output, _TEXT("  -------------------------------------------------------------------------------------------------------------------------------------------------------------\n"));
 		}
 
 		fclose(lo_output);
@@ -130,17 +137,6 @@ C_Profile_Chunk::C_Node::C_Node(const PTCHAR pa_str, __int64 pa_time)
 	}
 }
 
-C_Profile_Chunk::C_Profile_Chunk()
-{
-	s_tls_index = TlsAlloc();
-	if (s_tls_index == TLS_OUT_OF_INDEXES)
-	{
-		TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("NONE");
-		ST_Log lo_log({ "TlsAlloc Error Code: " + to_string(GetLastError()) });
-		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
-	}
-}
-
 C_Profile_Chunk::~C_Profile_Chunk()
 {
 	int size = m_node_list.size();
@@ -152,11 +148,11 @@ C_Profile_Chunk::~C_Profile_Chunk()
 
 void Olbbemi::Profile_Begin(const PTCHAR pa_str, int pa_line)
 {
-	void* lo_tls_ptr = TlsGetValue(C_Profile_Chunk::s_tls_index);
+	void* lo_tls_ptr = TlsGetValue(C_Profile::s_tls_index);
 	if (lo_tls_ptr == nullptr)
 	{
 		lo_tls_ptr = (C_Profile_Chunk*)C_Profile::S_Alloc();
-		BOOL lo_check = TlsSetValue(C_Profile_Chunk::s_tls_index, lo_tls_ptr);
+		BOOL lo_check = TlsSetValue(C_Profile::s_tls_index, lo_tls_ptr);
 		if (lo_check == 0)
 		{
 			TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("NONE");
@@ -200,7 +196,7 @@ void Olbbemi::Profile_Begin(const PTCHAR pa_str, int pa_line)
 
 void Olbbemi::Profile_End(const PTCHAR pa_str)
 {
-	void* lo_tls_ptr = TlsGetValue(C_Profile_Chunk::s_tls_index);
+	void* lo_tls_ptr = TlsGetValue(C_Profile::s_tls_index);
 
 	QueryPerformanceCounter(&((C_Profile_Chunk*)lo_tls_ptr)->m_end_count);
 	for (auto p = ((C_Profile_Chunk*)lo_tls_ptr)->m_node_list.begin(); p != ((C_Profile_Chunk*)lo_tls_ptr)->m_node_list.end(); p++)
@@ -208,10 +204,13 @@ void Olbbemi::Profile_End(const PTCHAR pa_str)
 		if (!_tcscmp((*p)->m_function_name, pa_str))
 		{
 			(*p)->m_call_count++;
-			(*p)->m_total_time += ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
+			__int64 lo_gap_time = ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
 
-			if ((*p)->m_min_count != 3 && (*p)->m_min_value[(*p)->m_min_count] > ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time)
-				(*p)->m_min_value[(*p)->m_min_count++] = ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
+
+			(*p)->m_total_time += lo_gap_time;
+
+			if ((*p)->m_min_count != 3 && (*p)->m_min_value[(*p)->m_min_count] > lo_gap_time)
+				(*p)->m_min_value[(*p)->m_min_count++] = lo_gap_time;
 			else if ((*p)->m_min_count == 3)
 			{
 				int lo_index = 0;
@@ -225,12 +224,12 @@ void Olbbemi::Profile_End(const PTCHAR pa_str)
 					}
 				}
 
-				if (((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time < comp_value)
-					(*p)->m_min_value[lo_index] = ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
+				if (lo_gap_time < comp_value)
+					(*p)->m_min_value[lo_index] = lo_gap_time;
 			}
 
-			if ((*p)->m_max_count != 3 && (*p)->m_max_value[(*p)->m_max_count] < ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time)
-				(*p)->m_max_value[(*p)->m_max_count++] = ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
+			if ((*p)->m_max_count != 3 && (*p)->m_max_value[(*p)->m_max_count] < lo_gap_time)
+				(*p)->m_max_value[(*p)->m_max_count++] = lo_gap_time;
 			else if ((*p)->m_max_count == 3)
 			{
 				int lo_index = 0;
@@ -244,8 +243,8 @@ void Olbbemi::Profile_End(const PTCHAR pa_str)
 					}
 				}
 
-				if (((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time > comp_value)
-					(*p)->m_max_value[lo_index] = ((C_Profile_Chunk*)lo_tls_ptr)->m_end_count.QuadPart - (*p)->m_start_time;
+				if (lo_gap_time > comp_value)
+					(*p)->m_max_value[lo_index] = lo_gap_time;
 			}
 
 			(*p)->m_start_time = 0;

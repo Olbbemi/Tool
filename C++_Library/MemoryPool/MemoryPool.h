@@ -341,12 +341,12 @@ namespace Olbbemi
 		/**----------------------------------------------------------------------------------------------------------------
 		  * 반환 받은 데이터를 이용하여 포인터연산 후 각 Chunk의 Free_count를 증가시킴
 		  * 해당 Chunk 에서 할당한 모든 노드가 반환 ( Free_count 가 배열 크기랑 동일한 경우 ) 되면 해당 Chunk를 메모리 풀에 반환
-		  * (char*)pa_node + sizeof(T) 위치에는 해당 노드가 위치하는 Chunk 시작주소를 저장
+		  * (char*)pa_node + ((sizeof(T) + 7) & ~7)) 위치에는 해당 노드가 위치하는 Chunk 시작주소를 저장 [ 64bit 이므로 모든 데이터는 8바이트 정렬( 메모리에서 해당 데이터의 시작 위치는 항상 8로 나누어 떨어짐) ]
 		  *----------------------------------------------------------------------------------------------------------------*/
 		void M_Free(T* pa_node)
 		{
 			LONG lo_interlock_value;
-			C_Chunk<T>* lo_chunk_ptr = (C_Chunk<T>*)(*((LONG64*)((char*)pa_node + sizeof(T))));
+			C_Chunk<T>* lo_chunk_ptr = (C_Chunk<T>*)(*((LONG64*)((char*)pa_node + ((sizeof(T) + 7) & ~7))));
 
 			InterlockedDecrement(&v_node_count);
 			lo_interlock_value = InterlockedDecrement(&(lo_chunk_ptr->m_free_count));

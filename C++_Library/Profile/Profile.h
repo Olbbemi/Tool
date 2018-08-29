@@ -10,14 +10,14 @@ using namespace std;
 
 namespace Olbbemi
 {
-	#define Profiler
-	#ifdef Profiler
-		#define BEGIN(Name, LINE)	Profile_Begin(Name, LINE)
-		#define END(Name)			Profile_End(Name)
-	#else
-		#define BEGIN(None)
-		#define END(None)
-	#endif
+#define Profiler
+#ifdef Profiler
+#define BEGIN(Name, LINE)	Profile_Begin(Name, LINE)
+#define END(Name)			Profile_End(Name)
+#else
+#define BEGIN(None)
+#define END(None)
+#endif
 
 	class C_Profile;
 
@@ -36,7 +36,7 @@ namespace Olbbemi
 
 			friend class C_Profile;
 			friend class C_Profile_Chunk;
-			
+
 			friend void Profile_Begin(const PTCHAR pa_str, int pa_line);
 			friend void Profile_End(const PTCHAR pa_str);
 		};
@@ -52,15 +52,12 @@ namespace Olbbemi
 		LARGE_INTEGER m_begin_count, m_end_count;
 		vector<C_Node*> m_node_list;
 
-		static DWORD s_tls_index;
-
 		friend class C_Profile;
 
 	public:
 
-		C_Profile_Chunk();
 		~C_Profile_Chunk();
-		
+
 		friend void Profile_Begin(const PTCHAR p_str, int p_line);
 		friend void Profile_End(const PTCHAR p_str);
 	};
@@ -74,9 +71,12 @@ namespace Olbbemi
 		LARGE_INTEGER m_frequency;
 
 		static LONG s_index;
-		static C_Profile_Chunk** s_chunk; 
+		static DWORD s_tls_index;
+		static C_Profile_Chunk** s_chunk;
 
 		friend class C_Profile_Chunk;
+		friend void Profile_Begin(const PTCHAR p_str, int p_line);
+		friend void Profile_End(const PTCHAR p_str);
 
 	public:
 		C_Profile(int pa_thread_count);
