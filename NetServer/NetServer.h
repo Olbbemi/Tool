@@ -1,5 +1,5 @@
-#ifndef LanServer_Info
-#define LanServer_Info
+#ifndef NetServer_Info
+#define NetServer_Info
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -14,13 +14,13 @@ namespace Olbbemi
 {
 	class C_Serialize;
 	class C_RINGBUFFER;
-	
-	class C_LanServer
+
+	class C_NetServer
 	{
 	private:
 		struct ST_Session
 		{
-			volatile LONG v_send_flag, v_session_info[2];
+			volatile LONG v_send_flag, v_session_info[2]; // [0]: is_alive, [1]: io_count
 			volatile ULONG v_send_count;
 			LONGLONG session_id;
 			SOCKET socket;
@@ -33,11 +33,21 @@ namespace Olbbemi
 			OVERLAPPED *recvOver, *sendOver;
 		};
 
+#pragma pack(push, 1)
+		struct ST_Header
+		{
+			BYTE code;
+			WORD len;
+			BYTE xor_code;
+			BYTE checksum;
+		};
+#pragma pack(pop)
+
 		bool m_is_nagle_on;
 		TCHAR m_ip[17];
-		BYTE m_workthread_count;
+		BYTE m_workthread_count, m_packet_code, m_first_key, m_second_key;
 		WORD m_port;
-		DWORD m_max_session_count;		
+		DWORD m_max_session_count;
 		LONGLONG m_session_count;
 
 		SOCKET m_listen_socket;
@@ -84,8 +94,12 @@ namespace Olbbemi
 		virtual void VIR_OnError(int pa_line, TCHAR* pa_action, EN_LogState pa_log_level, ST_Log* pa_log) = 0;
 
 	public:
-		bool M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session);
+		bool M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session, BYTE pa_packet_code, BYTE pa_first_key, BYTE pa_second_key);
 		void M_Stop();
+
+		void Encode(C_Serialize* pa_serialQ);
+		bool Decode(C_Serialize* pa_serialQ);
+
 
 		LONG M_TLSPoolAllocCount();
 		LONG M_TLSPoolChunkCount();

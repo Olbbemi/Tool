@@ -13,8 +13,6 @@ void C_Contents::VIR_OnClientJoin(LONGLONG pa_session_id, TCHAR* pa_ip, WORD pa_
 	__int64 lo_data = 0x7fffffffffffffff;
 
 	lo_serialQ->M_Enqueue((char*)&lo_data, 8);
-	lo_header = lo_serialQ->M_GetUsingSize();
-	lo_serialQ->M_MakeHeader((char*)&lo_header, 2);
 
 	C_Serialize::S_AddReference(lo_serialQ);
 	M_SendPacket(pa_session_id, lo_serialQ);
@@ -41,15 +39,12 @@ bool C_Contents::VIR_OnConnectionRequest(TCHAR* pa_ip, WORD pa_port)
 void C_Contents::VIR_OnRecv(LONGLONG pa_session_id, C_Serialize& pa_packet)
 {
 	char lo_buffer[8];
-	WORD lo_header = 0;
+	
 	C_Serialize *lo_serialQ = C_Serialize::S_Alloc();
 	lo_serialQ->M_InputHeaderSize(2);
 
 	memcpy_s(lo_buffer, 8, pa_packet.M_GetBufferPtr(), pa_packet.M_GetUsingSize());
-
 	lo_serialQ->M_Enqueue(lo_buffer, 8);
-	lo_header = lo_serialQ->M_GetUsingSize();
-	lo_serialQ->M_MakeHeader((char*)&lo_header, 2);
 
 	C_Serialize::S_AddReference(lo_serialQ);
 	M_SendPacket(pa_session_id, lo_serialQ);

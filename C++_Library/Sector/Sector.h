@@ -1,15 +1,7 @@
 #ifndef Sector_Info
 #define Sector_Info
-
-/*
- * 컨텐츠에 따라 추가해야할 구조체가 다르며 Sector 클래스 내부에 사용하는 STL 및 Define 값도 컨텐츠마다 다르게 적용해야 함
- */
-
-#include "Struct_Define.h"
-
-#include <list>
 #include <vector>
-#include <map>
+#include <unordered_map>
 using namespace std;
 
 #define TOTAL_GAME_SIZE 6400
@@ -18,20 +10,29 @@ using namespace std;
 
 namespace Olbbemi 
 {
-	class SECTOR
+	class C_Sector
 	{
 	private:
+		struct ST_User_Info
+		{
+
+
+
+		};
+
+
+
 		int m_width, m_height;
-		vector< vector< map<SOCKET, Session_Info*> > > m_session_array;
+		vector< vector< unordered_map<LONG64, ST_User_Info*> > > m_session_array;
 
 	public:
-		SECTOR();
-		~SECTOR();
+		C_Sector();
+		~C_Sector();
 
-		void SetUnitSectorPosition(Session_Info *p_session);
-		void GetUnitTotalSector(Session_Info *p_session, list<Session_Info*> &p_user_list);
-		void GetUnitVariationSector(Session_Info *p_session, list<Session_Info*> &p_old_sector_user_list, list<Session_Info*> &p_new_sector_user_list);
-		void DeleteUnitSector(Session_Info *p_session);
+		void SetUnitSectorPosition(ST_User_Info *p_session);
+		void GetUnitTotalSector(ST_User_Info *p_session, vector<ST_User_Info*> &p_user_list);
+		void GetUnitVariationSector(ST_User_Info *p_session, vector<ST_User_Info*> &p_old_sector_user_list, vector<ST_User_Info*> &p_new_sector_user_list);
+		void DeleteUnitSector(ST_User_Info *p_session);
 		void PrintSector();
 	};
 }

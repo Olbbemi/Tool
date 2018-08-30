@@ -1,6 +1,6 @@
 #include "Precompile.h"
-#include "LanServer.h"
-#include "Contents.h"
+#include "NetServer.h"
+#include "ChatServer.h"
 
 #include "Log/Log.h"
 #include "Profile/Profile.h"
@@ -19,7 +19,11 @@ int main()
 	TCHAR lo_ip[] = _TEXT("0.0.0.0");
 	WORD  lo_port = 6000;
 
-	C_LanServer* lo_server = new C_Contents;
+	C_NetServer* lo_server = new C_ChatServer;
+
+	// 파싱을 통한 데이터 수집작업이 들어가야 함
+
+
 
 	_MAKEDIR("Server");
 
@@ -45,7 +49,7 @@ int main()
 		{
 			if (g_is_start == true)
 			{
-				lo_server->M_Start(true, 4, lo_ip, lo_port, 100);
+				lo_server->M_Start(true, 4, lo_ip, lo_port, 100, 17, 201, 136);
 				printf("Server On!!!\n");
 			}
 
@@ -66,4 +70,11 @@ int main()
 		g_profile.M_Save();
 		Sleep(1);
 	}
+}
+
+void DataParsing()
+{
+
+
+
 }

@@ -33,7 +33,7 @@ namespace Olbbemi
 			volatile LONG64 block_info[2];
 		};
 
-		volatile LONG64 m_queue_size;
+		volatile LONG m_queue_size;
 		__declspec(align(16)) ST_Ptr m_front, m_rear;
 		C_MemoryPool<ST_Node> *m_pool;
 
@@ -57,10 +57,10 @@ namespace Olbbemi
 			m_queue_size = 0;
 		}
 
-		/**-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		/**--------------------------------------------------------------------
 	  	  * 현재 큐가 가지고 있는 노드를 모두 메모리 풀에 반환 및 사용 카운트 감소
 		  * 메모리 풀 객체 삭제
-		  *-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+		  *--------------------------------------------------------------------*/
 		~C_LFQueue()
 		{
 			ST_Node* lo_garbage;
@@ -82,7 +82,7 @@ namespace Olbbemi
 		  *---------------------------------------------------------------------------------------------------------------------------------------*/
 		void M_Enqueue(T pa_data)
 		{
-			__declspec(align(16)) LONG64 lo_rear[2], lo_front[2];
+			__declspec(align(16)) LONG64 lo_rear[2];
 
 			ST_Node* lo_new_node = m_pool->M_Alloc();
 			lo_new_node->data = pa_data;	lo_new_node->link = nullptr;
@@ -95,7 +95,7 @@ namespace Olbbemi
 				{
 					if (InterlockedCompareExchangePointer((PVOID*)&((ST_Node*)m_rear.block_info[0])->link, lo_new_node, nullptr) == nullptr)
 					{
-						InterlockedIncrement64(&m_queue_size);
+						InterlockedIncrement(&m_queue_size);
 						InterlockedCompareExchange128(m_rear.block_info, lo_rear[1] + 1, (LONG64)lo_new_node, lo_rear);
 						break;
 					}
@@ -148,7 +148,7 @@ namespace Olbbemi
 				pa_return_value = lo_next->data;
 				if (InterlockedCompareExchange128(m_front.block_info, lo_front[1] + 1, (LONG64)(((ST_Node*)lo_front[0])->link), lo_front) == 1)
 				{
-					InterlockedDecrement64(&m_queue_size);
+					InterlockedDecrement(&m_queue_size);
 
 					m_pool->M_Free((ST_Node*)lo_front[0]);	
 					break;
