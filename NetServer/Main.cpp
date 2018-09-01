@@ -49,7 +49,7 @@ int main()
 		{
 			if (g_is_start == true)
 			{
-				lo_server->M_Start(true, 4, lo_ip, lo_port, 100, 17, 201, 136);
+				lo_server->M_Start(true, 4, lo_ip, lo_port, 100, 17, 201, 12);
 				printf("Server On!!!\n");
 			}
 

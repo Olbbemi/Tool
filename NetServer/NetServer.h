@@ -70,7 +70,7 @@ namespace Olbbemi
 		static unsigned int __stdcall M_WorkerThread(void* pa_argument);
 
 	protected:
-		enum class EN_LogState : BYTE
+		enum class E_LogState : BYTE
 		{
 			system = 0,
 			error,
@@ -91,7 +91,7 @@ namespace Olbbemi
 		virtual void VIR_OnWorkerThreadBegin() = 0;
 		virtual void VIR_OnWorkerThreadEnd() = 0;
 
-		virtual void VIR_OnError(int pa_line, TCHAR* pa_action, EN_LogState pa_log_level, ST_Log* pa_log) = 0;
+		virtual void VIR_OnError(int pa_line, TCHAR* pa_action, E_LogState pa_log_level, ST_Log* pa_log) = 0;
 
 	public:
 		bool M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session, BYTE pa_packet_code, BYTE pa_first_key, BYTE pa_second_key);

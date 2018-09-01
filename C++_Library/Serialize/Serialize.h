@@ -87,21 +87,22 @@ namespace Olbbemi
 
 		static C_MemoryPoolTLS<C_Serialize> s_memory_pool;
 
+		void M_Resize(const int pa_remain_size, const int pa_input_size);
+
 	public:
 		C_Serialize();
 		~C_Serialize();
 
-		static C_Serialize* S_Alloc();
+		static C_Serialize* S_Alloc(int pa_head_size);
 		static void S_Free(C_Serialize* pa_serialQ);
 		static void S_AddReference(C_Serialize* pa_serialQ);
 		static LONG S_TLSAllocCount();
 		static LONG S_TLSChunkCount();
 		static LONG S_TLSNodeCount();
 
-
 		void M_Enqueue(char *pa_src, const int pa_size);
 		void M_Dequeue(char *pa_dest, const int pa_size);
-		void M_Resize(const int pa_remain_size, const int pa_input_size);
+		
 
 		char* M_GetBufferPtr() const;
 		int M_GetUsingSize() const;

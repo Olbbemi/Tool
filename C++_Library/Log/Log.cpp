@@ -78,7 +78,7 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 	_ftprintf(input, _TEXT("%s\n"), output_buffer);
 
 	for (int i = 0; i < pa_str_count; i++)
-		fprintf(input, "%s\n", pa_error_str[i]);
+		fprintf(input, "%s\n", pa_error_str[i].c_str());
 	
 	fclose(input);
 	ReleaseSRWLockExclusive(&m_log_srwLock);

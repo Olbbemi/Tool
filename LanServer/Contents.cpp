@@ -7,8 +7,8 @@ using namespace Olbbemi;
 void C_Contents::VIR_OnClientJoin(LONGLONG pa_session_id, TCHAR* pa_ip, WORD pa_port)
 {
 	WORD lo_header;
-	C_Serialize *lo_serialQ = C_Serialize::S_Alloc();
-	lo_serialQ->M_InputHeaderSize(2);
+	C_Serialize *lo_serialQ = C_Serialize::S_Alloc(2);
+	//lo_serialQ->M_InputHeaderSize(2);
 
 	__int64 lo_data = 0x7fffffffffffffff;
 
@@ -40,8 +40,8 @@ void C_Contents::VIR_OnRecv(LONGLONG pa_session_id, C_Serialize& pa_packet)
 {
 	char lo_buffer[8];
 	
-	C_Serialize *lo_serialQ = C_Serialize::S_Alloc();
-	lo_serialQ->M_InputHeaderSize(2);
+	C_Serialize *lo_serialQ = C_Serialize::S_Alloc(2);
+	//lo_serialQ->M_InputHeaderSize(2);
 
 	memcpy_s(lo_buffer, 8, pa_packet.M_GetBufferPtr(), pa_packet.M_GetUsingSize());
 	lo_serialQ->M_Enqueue(lo_buffer, 8);

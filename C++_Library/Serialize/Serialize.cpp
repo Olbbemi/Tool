@@ -8,10 +8,12 @@ using namespace Olbbemi;
 
 C_MemoryPoolTLS<C_Serialize> C_Serialize::s_memory_pool(false);
 
-C_Serialize* C_Serialize::S_Alloc()
+C_Serialize* C_Serialize::S_Alloc(int pa_head_size)
 {
 	C_Serialize* lo_serialQ = s_memory_pool.M_Alloc();
+	lo_serialQ->M_InputHeaderSize(pa_head_size);
 	InterlockedIncrement(&lo_serialQ->m_ref_count);
+
 	return lo_serialQ;
 }
 

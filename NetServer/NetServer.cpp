@@ -48,7 +48,7 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 	if (m_iocp_handle == NULL)
 	{
 		ST_Log *lo_log = new ST_Log({ "Create IOCP Handle Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 		return false;
 	}
@@ -57,7 +57,7 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 	if (m_thread_handle[0] == 0)
 	{
 		ST_Log *lo_log = new ST_Log({ "Create AcceptThread Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 		return false;
 	}
@@ -68,7 +68,7 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 		if (m_thread_handle[i] == 0)
 		{
 			ST_Log *lo_log = new ST_Log({ "Create WorkerThread Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 			return false;
 		}
@@ -114,7 +114,7 @@ void C_NetServer::M_Stop()
 	{
 		TCHAR lo_action[] = _TEXT("NetServer");
 		ST_Log *lo_log = new ST_Log({ "WaitForMulti Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 	}
 
 	for (int i = 0; i < m_workthread_count + 1; ++i)
@@ -183,7 +183,7 @@ unsigned int C_NetServer::M_Accept()
 	if (m_listen_socket == INVALID_SOCKET)
 	{
 		ST_Log *lo_log = new ST_Log({ "Listen Socket Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 		return 0;
 	}
@@ -197,7 +197,7 @@ unsigned int C_NetServer::M_Accept()
 	if (lo_error_check == SOCKET_ERROR)
 	{
 		ST_Log *lo_log = new ST_Log({ "Socket Bind Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 		return 0;
 	}
@@ -206,7 +206,7 @@ unsigned int C_NetServer::M_Accept()
 	if (lo_error_check == SOCKET_ERROR)
 	{
 		ST_Log *lo_log = new ST_Log({ "Listen Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 
 		return 0;
 	}
@@ -221,7 +221,7 @@ unsigned int C_NetServer::M_Accept()
 				break;
 
 			ST_Log *lo_log = new ST_Log({ "Socket Accept Error Code: " + to_string(lo_error) });
-			VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 			closesocket(lo_client_socket);
 
 			continue;
@@ -239,7 +239,7 @@ unsigned int C_NetServer::M_Accept()
 			wstring lo_buffer = lo_confirm_ip;		string lo_via_buffer(lo_buffer.begin(), lo_buffer.end());
 
 			ST_Log *lo_log = new ST_Log({ "Ip: " + lo_via_buffer + ", Port: " + to_string(lo_confirm_port) + "Can't Accpet" });
-			VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 			closesocket(lo_client_socket);
 
 			continue;
@@ -263,7 +263,7 @@ unsigned int C_NetServer::M_Accept()
 		if (lo_iocp_check == false)
 		{
 			ST_Log *lo_log = new ST_Log({ "IOCP Matching Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 			M_Release(m_session_list[lo_avail_index].session_id);
 
 			continue;
@@ -314,7 +314,7 @@ unsigned int C_NetServer::M_PacketProc()
 		else if (lo_overlap == nullptr)
 		{
 			ST_Log *lo_log = new ST_Log({ "GQCS Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 		}
 		else if (lo_transfered != 0 && lo_overlap == lo_session->recvOver)
 		{
@@ -348,8 +348,6 @@ unsigned int C_NetServer::M_PacketProc()
 
 			if(lo_check == true)
 				lo_recvpost_value = M_RecvPost(lo_session);
-			else
-				M_Release(lo_session->session_id);
 		}
 		else if (lo_overlap == lo_session->sendOver)
 		{
@@ -374,7 +372,7 @@ unsigned int C_NetServer::M_PacketProc()
 			{
 				// 좀 더 많은 데이터를 남기도록 설정
 				ST_Log *lo_log = new ST_Log({ "IO Count is Nagative: " + to_string(interlock_value) });
-				VIR_OnError(__LINE__, lo_action, EN_LogState::system, lo_log);
+				VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
 			}
 		}
 	}
@@ -396,18 +394,15 @@ void C_NetServer::Encode(C_Serialize* pa_serialQ)
 	lo_header.len = pa_serialQ->M_GetUsingSize();
 	lo_header.xor_code = (rand() & 255);
 
+	lo_header.checksum = 0;
 	for (int i = 0; i < lo_header.len; i++)
-		lo_sum += serialQ_ptr[i];
-	lo_header.checksum = (BYTE)(lo_sum & 255LL);
-
+		lo_header.checksum += serialQ_ptr[i];
+	
+	lo_header.xor_code ^= lo_mixture_key;
 	lo_header.checksum ^= lo_header.xor_code;
+
 	for (int i = 0; i < lo_header.len; i++)
 		serialQ_ptr[i] ^= lo_header.xor_code;
-
-	lo_header.xor_code ^= lo_mixture_key;
-	lo_header.checksum ^= lo_mixture_key;
-	for (int i = 0; i < lo_header.len; i++)
-		serialQ_ptr[i] ^= lo_mixture_key;
 
 	pa_serialQ->M_MakeHeader((char*)&lo_header, sizeof(ST_Header));
 }
@@ -418,18 +413,13 @@ void C_NetServer::Encode(C_Serialize* pa_serialQ)
 bool C_NetServer::Decode(C_Serialize* pa_serialQ)
 {
 	BYTE lo_mixture_key = m_first_key ^ m_second_key;
-	__int64 lo_sum = 0;
+	BYTE lo_sum = 0;
 	ST_Header* lo_header = (ST_Header*)pa_serialQ->M_GetBufferPtr();
 	if (lo_header->code != m_packet_code)
 		return false;
 	
 	pa_serialQ->M_MoveFront(HEADER_SIZE);
 	char* serialQ_ptr = (char*)((char*)lo_header + HEADER_SIZE);
-
-	lo_header->xor_code ^= lo_mixture_key;
-	lo_header->checksum ^= lo_mixture_key;
-	for (int i = 0; i < lo_header->len; i++)
-		serialQ_ptr[i] ^= lo_mixture_key;
 
 	lo_header->checksum ^= lo_header->xor_code;
 	for (int i = 0; i < lo_header->len; i++)
@@ -438,7 +428,7 @@ bool C_NetServer::Decode(C_Serialize* pa_serialQ)
 	for (int i = 0; i < lo_header->len; i++)
 		lo_sum += (BYTE)serialQ_ptr[i];
 	
-	if (lo_header->checksum != (BYTE)(lo_sum & 255LL))
+	if (lo_header->checksum != lo_sum)
 		return false;
 	
 	return true;
