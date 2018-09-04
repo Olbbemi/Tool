@@ -1,6 +1,7 @@
 #include "Precompile.h"
 #include "NetServer.h"
 
+#include "Protocol/Define.h"
 #include "Profile/Profile.h"
 #include "Serialize/Serialize.h"
 #include "RingBuffer/RingBuffer.h"
@@ -9,10 +10,8 @@
 #include <strsafe.h>
 
 #define INDEX_VALUE 255
-#define YES 1
-#define NO 0
-
-#define HEADER_SIZE 5
+#define IS_ALIVE 1
+#define IS_NOT_ALIVE 0
 
 using namespace Olbbemi;
 
@@ -23,7 +22,9 @@ using namespace Olbbemi;
   *-----------------------------------------------------------------------------------------------------------*/
 bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session, BYTE pa_packet_code, BYTE pa_first_key, BYTE pa_second_key)
 {
-	TCHAR lo_action[] = _TEXT("NetServer");
+	TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+
+	m_total_accept = 0;
 
 	m_session_count = 0;
 	m_is_nagle_on = pa_is_nagle_on;			m_workthread_count = pa_work_count;
@@ -37,18 +38,18 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 
 	m_thread_handle = new HANDLE[pa_work_count + 1];
 	m_session_list = new ST_Session[pa_max_session];
-	for (int i = 0; i < pa_max_session; i++)
+	for (int i = 1; i < pa_max_session; i++)
 	{
 		m_session_list[i].v_session_info[1] = 0;
-		m_session_list[i].v_session_info[0] = NO;
+		m_session_list[i].v_session_info[0] = IS_NOT_ALIVE;
 		m_probable_index->M_Push(i);
 	}
 
 	M_CreateIOCPHandle(m_iocp_handle);
 	if (m_iocp_handle == NULL)
 	{
-		ST_Log *lo_log = new ST_Log({ "Create IOCP Handle Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		ST_Log lo_log({ "Create IOCP Handle Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 		return false;
 	}
@@ -56,8 +57,8 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 	m_thread_handle[0] = (HANDLE)_beginthreadex(NULL, 0, M_AcceptThread, this, 0, nullptr);
 	if (m_thread_handle[0] == 0)
 	{
-		ST_Log *lo_log = new ST_Log({ "Create AcceptThread Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		ST_Log lo_log({ "Create AcceptThread Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 		return false;
 	}
@@ -67,8 +68,8 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 		m_thread_handle[i] = (HANDLE)_beginthreadex(NULL, 0, M_WorkerThread, this, 0, nullptr);
 		if (m_thread_handle[i] == 0)
 		{
-			ST_Log *lo_log = new ST_Log({ "Create WorkerThread Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+			ST_Log lo_log({ "Create WorkerThread Error Code: " + to_string(WSAGetLastError()) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 			return false;
 		}
@@ -87,7 +88,7 @@ void C_NetServer::M_Stop()
 	closesocket(m_listen_socket);
 	for (int i = 0; i < m_max_session_count; ++i)
 	{
-		if (m_session_list[i].v_session_info[0] == YES)
+		if (m_session_list[i].v_session_info[0] == IS_ALIVE)
 			shutdown(m_session_list[i].socket, SD_BOTH);
 	}
 
@@ -107,14 +108,15 @@ void C_NetServer::M_Stop()
 			break;
 	}
 
+	VIR_OnClose();
 	PostQueuedCompletionStatus(m_iocp_handle, 0, 0, 0);
 
 	DWORD lo_wait_value = WaitForMultipleObjects(m_workthread_count + 1, m_thread_handle, TRUE, INFINITE);
 	if (lo_wait_value == WAIT_FAILED)
 	{
-		TCHAR lo_action[] = _TEXT("NetServer");
-		ST_Log *lo_log = new ST_Log({ "WaitForMulti Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+		ST_Log lo_log({ "WaitForMulti Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
 
 	for (int i = 0; i < m_workthread_count + 1; ++i)
@@ -167,11 +169,12 @@ unsigned int __stdcall C_NetServer::M_WorkerThread(void* pa_argument)
   * 연결이 성공적으로 이루어지면 해당 클라이언트를 저장할 배열인덱스를 락프리 스택을 이용하여 얻어옴
   * 해당 배열에 리소스 할당 및 소켓을 IOCP에 등록
   * Stop 함수에서 listen_socket 을 종료하면 accept 에서 에러 발생하여 해당 쓰레드를 종료하는 방법 이용
+  * 쓰레드가 종료되기 전 직렬화 버퍼의 메모리 누수를 막기 위해 C_Serialize::S_Terminate() 함수 호출
   *-----------------------------------------------------------------------------------------------*/
 unsigned int C_NetServer::M_Accept()
 {
-	TCHAR lo_action[] = _TEXT("NetServer");
-
+	TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+	
 	WSADATA lo_wsadata;
 	SOCKET lo_client_socket;
 	SOCKADDR_IN lo_server_address, lo_client_address;
@@ -182,8 +185,8 @@ unsigned int C_NetServer::M_Accept()
 	m_listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (m_listen_socket == INVALID_SOCKET)
 	{
-		ST_Log *lo_log = new ST_Log({ "Listen Socket Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		ST_Log lo_log({ "Listen Socket Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 		return 0;
 	}
@@ -196,8 +199,8 @@ unsigned int C_NetServer::M_Accept()
 	lo_error_check = bind(m_listen_socket, (SOCKADDR*)&lo_server_address, sizeof(lo_server_address));
 	if (lo_error_check == SOCKET_ERROR)
 	{
-		ST_Log *lo_log = new ST_Log({ "Socket Bind Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		ST_Log lo_log({ "Socket Bind Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 		return 0;
 	}
@@ -205,8 +208,8 @@ unsigned int C_NetServer::M_Accept()
 	lo_error_check = listen(m_listen_socket, SOMAXCONN);
 	if (lo_error_check == SOCKET_ERROR)
 	{
-		ST_Log *lo_log = new ST_Log({ "Listen Error Code: " + to_string(WSAGetLastError()) });
-		VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+		ST_Log lo_log({ "Listen Error Code: " + to_string(WSAGetLastError()) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 
 		return 0;
 	}
@@ -218,10 +221,13 @@ unsigned int C_NetServer::M_Accept()
 		{
 			int lo_error = WSAGetLastError();
 			if (lo_error == WSAEINTR || lo_error == WSAENOTSOCK)
+			{
+				C_Serialize::S_Terminate();
 				break;
-
-			ST_Log *lo_log = new ST_Log({ "Socket Accept Error Code: " + to_string(lo_error) });
-			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+			}
+				
+			ST_Log lo_log({ "Socket Accept Error Code: " + to_string(lo_error) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			closesocket(lo_client_socket);
 
 			continue;
@@ -238,8 +244,8 @@ unsigned int C_NetServer::M_Accept()
 		{
 			wstring lo_buffer = lo_confirm_ip;		string lo_via_buffer(lo_buffer.begin(), lo_buffer.end());
 
-			ST_Log *lo_log = new ST_Log({ "Ip: " + lo_via_buffer + ", Port: " + to_string(lo_confirm_port) + "Can't Accpet" });
-			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+			ST_Log lo_log({ "Ip: " + lo_via_buffer + ", Port: " + to_string(lo_confirm_port) + "Can't Accpet" });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			closesocket(lo_client_socket);
 
 			continue;
@@ -256,14 +262,14 @@ unsigned int C_NetServer::M_Accept()
 		m_session_list[lo_avail_index].recvOver = new OVERLAPPED;	m_session_list[lo_avail_index].sendOver = new OVERLAPPED;
 		m_session_list[lo_avail_index].recvQ = new C_RINGBUFFER;	m_session_list[lo_avail_index].sendQ = new C_LFQueue<C_Serialize*>;
 		m_session_list[lo_avail_index].v_session_info[1] = 0;		m_session_list[lo_avail_index].session_id = ((m_session_count << 16) | lo_avail_index);
-		m_session_list[lo_avail_index].v_session_info[0] = YES;		m_session_list[lo_avail_index].v_send_flag = FALSE;
+		m_session_list[lo_avail_index].v_session_info[0] = IS_ALIVE;		m_session_list[lo_avail_index].v_send_flag = FALSE;
 		m_session_count++;
 
 		lo_iocp_check = M_MatchIOCPHandle(lo_client_socket, &m_session_list[lo_avail_index]);
 		if (lo_iocp_check == false)
 		{
-			ST_Log *lo_log = new ST_Log({ "IOCP Matching Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+			ST_Log lo_log({ "IOCP Matching Error Code: " + to_string(WSAGetLastError()) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			M_Release(m_session_list[lo_avail_index].session_id);
 
 			continue;
@@ -274,6 +280,7 @@ unsigned int C_NetServer::M_Accept()
 		VIR_OnClientJoin(m_session_list[lo_avail_index].session_id, lo_confirm_ip, lo_confirm_port);
 		M_RecvPost(&m_session_list[lo_avail_index]);
 
+		m_total_accept++;
 
 		LONG interlock_value = InterlockedDecrement(&m_session_list[lo_avail_index].v_session_info[1]);
 		if (interlock_value == 0)
@@ -284,16 +291,16 @@ unsigned int C_NetServer::M_Accept()
 	return 1;
 }
 
-/**------------------------------------------------------------------------------
+/**---------------------------------------------------------------------------------------------
   * Worker 쓰레드에서 호출한 콜백 함수
   * IOCP 를 이용하여 모든 클라이언트의 패킷 송수신을 처리
   * 각 세션마다 IO_count 를 소유하고 있으며 이 값이 0이 되는 경우에만 세션 종료
   * 외부에서 PostQueuedCompletionStatus 함수를 호출하면 해당 쓰레드가 종료되는 구조
-  *------------------------------------------------------------------------------*/
+  * 쓰레드가 종료되기 전 직렬화 버퍼의 메모리 누수를 막기 위해 C_Serialize::S_Terminate() 함수 호출
+  *---------------------------------------------------------------------------------------------*/
 unsigned int C_NetServer::M_PacketProc()
 {
-	TCHAR lo_profile_name[] = _TEXT("worker");
-	TCHAR lo_action[] = _TEXT("NetServer");
+	TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
 
 	while (1)
 	{
@@ -308,13 +315,14 @@ unsigned int C_NetServer::M_PacketProc()
 
 		if (lo_transfered == 0 && lo_session == nullptr && lo_overlap == nullptr)
 		{
+			C_Serialize::S_Terminate();
 			PostQueuedCompletionStatus(m_iocp_handle, 0, 0, 0);
 			break;
 		}
 		else if (lo_overlap == nullptr)
 		{
-			ST_Log *lo_log = new ST_Log({ "GQCS Error Code: " + to_string(WSAGetLastError()) });
-			VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+			ST_Log lo_log({ "GQCS Error Code: " + to_string(WSAGetLastError()) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 		}
 		else if (lo_transfered != 0 && lo_overlap == lo_session->recvOver)
 		{
@@ -325,25 +333,35 @@ unsigned int C_NetServer::M_PacketProc()
 			{
 				int lo_size = 0, lo_recv_size;
 				ST_Header lo_header;
-				C_Serialize lo_serialQ;
+				C_Serialize* lo_serialQ = C_Serialize::S_Alloc();
 				
 				lo_recv_size = lo_session->recvQ->M_GetUseSize();
-
-				if (lo_recv_size < HEADER_SIZE)
+				if (lo_recv_size < NET_HEAD_SIZE)
+				{
+					C_Serialize::S_Free(lo_serialQ);
 					break;
-
-				lo_session->recvQ->M_Peek((char*)&lo_header, HEADER_SIZE, lo_size);
-				if (lo_recv_size < lo_header.len + HEADER_SIZE)
+				}
+					
+				lo_session->recvQ->M_Peek((char*)&lo_header, NET_HEAD_SIZE, lo_size);
+				if (lo_recv_size < lo_header.len + NET_HEAD_SIZE)
+				{
+					C_Serialize::S_Free(lo_serialQ);
 					break;
+				}
+					
+				lo_session->recvQ->M_Dequeue(lo_serialQ->M_GetBufferPtr(), lo_header.len + NET_HEAD_SIZE);
+				lo_serialQ->M_MoveRear(lo_header.len + NET_HEAD_SIZE);
 
-				lo_session->recvQ->M_Dequeue(lo_serialQ.M_GetBufferPtr(), lo_header.len + HEADER_SIZE);
-				lo_serialQ.M_MoveRear(lo_header.len + HEADER_SIZE);
-
-				lo_check = Decode(&lo_serialQ);
+				lo_check = Decode(lo_serialQ);
 				if (lo_check == false)
+				{
+					C_Serialize::S_Free(lo_serialQ);
 					break;
-				
+				}
+
+				C_Serialize::S_AddReference(lo_serialQ);
 				VIR_OnRecv(lo_session->session_id, lo_serialQ);
+				C_Serialize::S_Free(lo_serialQ);
 			}
 
 			if(lo_check == true)
@@ -370,24 +388,30 @@ unsigned int C_NetServer::M_PacketProc()
 				M_Release(lo_session->session_id);
 			else if (interlock_value < 0)
 			{
-				// 좀 더 많은 데이터를 남기도록 설정
-				ST_Log *lo_log = new ST_Log({ "IO Count is Nagative: " + to_string(interlock_value) });
-				VIR_OnError(__LINE__, lo_action, E_LogState::system, lo_log);
+				ST_Log lo_log({ "IO Count is Nagative: " + to_string(interlock_value) });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
-/**------------------------------------
-  *
-  *------------------------------------*/
+/**----------------------------------------------------------------------------------------------------------------------------------
+  * 인코딩할 때 사용할 키 값 및 체크 코드를 Start 함수에서 얻어옴 
+  * 패킷을 전송하기 전 키 값으로 암호화 후 서버 프로토콜에 맞는 헤더 삽입
+  * 동일 패킷에 대해서 암호화를 할 필요가 없으므로 flag를 이용하여 이미 인코딩된 패킷인지 확인
+  * 주어진 암호화 방식에는 문제점이 있음 [ 난수로 할당 받는 암호 키까지 고정 키로 암호화를 함으로써 고정키가 달라도 암호화가 해제 되어버림 ]
+  *----------------------------------------------------------------------------------------------------------------------------------*/
 void C_NetServer::Encode(C_Serialize* pa_serialQ)
 {
+	if (pa_serialQ->m_is_encode == true)
+		return;
+
+	pa_serialQ->m_is_encode = true;
+
 	char* serialQ_ptr = pa_serialQ->M_GetBufferPtr();
 	BYTE lo_mixture_key = m_first_key ^ m_second_key;
-	__int64 lo_sum = 0;
 	ST_Header lo_header;
 
 	lo_header.code = m_packet_code;
@@ -404,12 +428,13 @@ void C_NetServer::Encode(C_Serialize* pa_serialQ)
 	for (int i = 0; i < lo_header.len; i++)
 		serialQ_ptr[i] ^= lo_header.xor_code;
 
-	pa_serialQ->M_MakeHeader((char*)&lo_header, sizeof(ST_Header));
+	pa_serialQ->M_NetMakeHeader((char*)&lo_header, sizeof(ST_Header));
 }
 
-/**------------------------------------
-  *
-  *------------------------------------*/
+/**----------------------------------------------------------------------------
+  * 수신한 패킷을 고정 키 값으로 해제 후 Checksum 비교
+  * 컨텐츠 처리부는 서버 프로토콜이 필요없으므로 이 정보는 제외하고 전송하도록 설정
+  *----------------------------------------------------------------------------*/
 bool C_NetServer::Decode(C_Serialize* pa_serialQ)
 {
 	BYTE lo_mixture_key = m_first_key ^ m_second_key;
@@ -418,8 +443,8 @@ bool C_NetServer::Decode(C_Serialize* pa_serialQ)
 	if (lo_header->code != m_packet_code)
 		return false;
 	
-	pa_serialQ->M_MoveFront(HEADER_SIZE);
-	char* serialQ_ptr = (char*)((char*)lo_header + HEADER_SIZE);
+	pa_serialQ->M_MoveFront(NET_HEAD_SIZE);
+	char* serialQ_ptr = (char*)((char*)lo_header + NET_HEAD_SIZE);
 
 	lo_header->checksum ^= lo_header->xor_code;
 	for (int i = 0; i < lo_header->len; i++)
@@ -434,57 +459,82 @@ bool C_NetServer::Decode(C_Serialize* pa_serialQ)
 	return true;
 }
 
-/**------------------------------------
-  *
-  *------------------------------------*/
-void C_NetServer::M_SendPacket(LONGLONG pa_session_id, C_Serialize* pa_packet)
+/**---------------------------------------------------------------------------------------------------------
+  * 컨텐츠에서 패킷을 보내거나 세션연결을 종료하기 위해 사용되는 함수내에 호출
+  * 해당 세션의 IO_count를 증가
+  * 해당 세션이 이미 Release 단계에 들어간 경우에는 패킷 전송 및 세션 종료를하면 안되므로 interlock을 통하여 확인
+  * 이미 Release 단계로 들어갔다면 0을 반환 [ 세션 배열에서 0은 사용하지 않음 ]
+  *---------------------------------------------------------------------------------------------------------*/
+WORD C_NetServer::SessionAcquireLock(LONG64 pa_session_id)
 {
 	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
-	LONGLONG lo_id = (pa_session_id >> 16);
+	LONG64 lo_id = (pa_session_id >> 16);
 
 	if (m_session_list[lo_index].session_id != pa_session_id)
+		return 0;
+	
+	InterlockedIncrement(&m_session_list[lo_index].v_session_info[1]);
+	if (InterlockedCompareExchange(&m_session_list[lo_index].v_session_info[0], IS_NOT_ALIVE, IS_NOT_ALIVE) == IS_NOT_ALIVE)
+	{
+		LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
+		if (lo_count == 0)
+			M_Release(pa_session_id);
+		return 0;
+	}
+
+	return lo_index;
+}
+
+/**--------------------------------------------------------------------------------
+  * SessionAcquireLock 함수와 한 쌍을 이루는 함수
+  * 위 함수를 호출한 위치의 마지막에는 SesseionAcquireUnlock 함수를 꼭 호출해주어야 함
+  *--------------------------------------------------------------------------------*/
+void C_NetServer::SessionAcquireUnlock(LONG64 pa_session_id)
+{
+	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
+	LONG64 lo_id = (pa_session_id >> 16);
+
+	LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
+	if (lo_count == 0)
+		M_Release(pa_session_id);
+}
+
+/**---------------------------------------------------------
+  * 컨텐츠나 네트워크에서 보낼 패킷이 있을 때마다 호출하는 함수
+  *---------------------------------------------------------*/
+void C_NetServer::M_SendPacket(LONG64 pa_session_id, C_Serialize* pa_packet)
+{
+	WORD lo_index = SessionAcquireLock(pa_session_id);
+	if (lo_index == 0)
 	{
 		C_Serialize::S_Free(pa_packet);
 		return;
 	}
-
-	// 이부분을 함수로 추출하기
-	InterlockedIncrement(&m_session_list[lo_index].v_session_info[1]);
-	if (InterlockedCompareExchange(&m_session_list[lo_index].v_session_info[0], NO, NO) == NO)
-	{
-
-		return;
-	}
-
+		
 	Encode(pa_packet);
 
 	C_Serialize::S_AddReference(pa_packet);
 	m_session_list[lo_index].sendQ->M_Enqueue(pa_packet);
 	
 	M_SendPost(&m_session_list[lo_index]);
-
 	C_Serialize::S_Free(pa_packet);
-	LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
-	if (lo_count == 0)
-		M_Release(pa_session_id);
+
+	SessionAcquireUnlock(pa_session_id);
 }
 
-// 컨텐츠 넣으면 매개변수 수정 및 내용 수정하기
-bool C_NetServer::M_Disconnect(WORD pa_index)
+/**-----------------------------------------------------------------------------------------------------------------------------
+  * 컨텐츠에서 종료를 원할 때 호출하는 함수
+  * 해당 세션이 Release 단계에 들어가면 OnRelease 함수가 호출되므로 해당 함수 호출하기 전 컨텐츠에서 해당 세션을 미리 정리할 필요 없음
+  * 서버에서 먼저 종료를 요청하는 것이므로 closesocket이 아닌 shutdown 함수를 호출해야 함
+  *-----------------------------------------------------------------------------------------------------------------------------*/
+void C_NetServer::M_Disconnect(LONG64 pa_session_id)
 {
-	/*
-
-
-	*/
-
-	//if (m_session_list[pa_index].v_is_alive == false)
-	//{
-	//	// error
-	//	return false;
-	//}
-
-	shutdown(m_session_list[pa_index].socket, SD_BOTH);
-	return true;
+	WORD lo_index = SessionAcquireLock(pa_session_id);
+	if (lo_index == 0)
+		return;
+	
+	shutdown(m_session_list[lo_index].socket, SD_BOTH);
+	SessionAcquireUnlock(pa_session_id);
 }
 
 /**---------------------------------------
@@ -590,7 +640,7 @@ char C_NetServer::M_SendPost(ST_Session* pa_session)
 /**-------------------------------------------------------------------------------
   * 세션을 종료하기 위해 호출되는 함수 [ 해당 세션이 사용한 모든 리소스 해제 및 반환 ]
   *-------------------------------------------------------------------------------*/
-void C_NetServer::M_Release(LONGLONG pa_session_id)
+void C_NetServer::M_Release(LONG64 pa_session_id)
 {
 	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
 
@@ -598,7 +648,7 @@ void C_NetServer::M_Release(LONGLONG pa_session_id)
 	lo_session_info[0] = m_session_list[lo_index].v_session_info[0];
 	lo_session_info[1] = m_session_list[lo_index].v_session_info[1];
 
-	if (InterlockedCompareExchange64((LONG64*)m_session_list[lo_index].v_session_info, NO, *((LONG64*)lo_session_info)) != *((LONG64*)lo_session_info))
+	if (InterlockedCompareExchange64((LONG64*)m_session_list[lo_index].v_session_info, IS_NOT_ALIVE, *((LONG64*)lo_session_info)) != *((LONG64*)lo_session_info))
 		return;
 
 	VIR_OnClientLeave(pa_session_id);
@@ -666,7 +716,7 @@ LONG C_NetServer::M_QueueAllocCount()
 	LONG return_value = 0;
 	for (int i = 0; i < m_max_session_count; i++)
 	{
-		if (m_session_list[i].v_session_info[0] == YES)
+		if (m_session_list[i].v_session_info[0] == IS_ALIVE)
 			return_value += m_session_list[i].sendQ->M_GetAllocCount();
 	}
 
@@ -678,9 +728,14 @@ LONG C_NetServer::M_QueueUseCount()
 	LONG return_value = 0;
 	for (int i = 0; i < m_max_session_count; i++)
 	{
-		if (m_session_list[i].v_session_info[0] == YES)
+		if (m_session_list[i].v_session_info[0] == IS_ALIVE)
 			return_value += m_session_list[i].sendQ->M_GetUseCount();
 	}
 
 	return return_value;
+}
+
+LONG64 C_NetServer::M_TotalAcceptCount()
+{
+	return m_total_accept;
 }

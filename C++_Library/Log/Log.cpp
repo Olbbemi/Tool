@@ -48,11 +48,16 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 	cur_time = time(NULL);
 	localtime_s(&time_info, &cur_time);
 
-	StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_Log.txt"), m_dir_path, pa_action, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
+	StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_Log.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 	_tfopen_s(&input, file_name, _TEXT("a"));
 
 	switch (pa_log_level)
 	{
+	case LOG_LEVEL_POWER:
+		StringCchPrintf(log_buffer, 30, _TEXT("Status: -----POWER"));
+		_ftprintf(input, _TEXT("%s\n"), log_buffer);
+		break;
+
 		case LOG_LEVEL_SYSTEM:
 			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----SYSTEM"));
 			_ftprintf(input, _TEXT("%s\n"), log_buffer);
@@ -74,7 +79,7 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 			break;
 	}
 
-	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_server, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
+	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_action, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
 	_ftprintf(input, _TEXT("%s\n"), output_buffer);
 
 	for (int i = 0; i < pa_str_count; i++)
@@ -101,10 +106,10 @@ void C_Log::S_BinaryLog(int pa_line, TCHAR* pa_action, TCHAR* pa_server, char* p
 	cur_time = time(NULL);
 	localtime_s(&time_info, &cur_time);
 
-	StringCchPrintf(file_name, 50, _TEXT("%s/%s_%04d%02d%02d_BinaryLog.txt"), m_dir_path, pa_action, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
+	StringCchPrintf(file_name, 50, _TEXT("%s/%s_%04d%02d%02d_BinaryLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 	_tfopen_s(&input, file_name, _TEXT("a"));
 
-	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_server, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
+	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_action, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
 	_ftprintf(input, _TEXT("%s\n"), output_buffer);
 
 	fprintf(input, "Binary : [");

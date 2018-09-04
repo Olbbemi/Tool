@@ -1,10 +1,11 @@
 #ifndef Log_Info
 #define Log_Info
 
-#define LOG_LEVEL_SYSTEM  0
-#define LOG_LEVEL_ERROR   1
-#define LOG_LEVEL_WARNING 2
-#define LOG_LEVEL_DEBUG   3
+#define LOG_LEVEL_POWER	  0
+#define LOG_LEVEL_SYSTEM  1
+#define LOG_LEVEL_ERROR   2
+#define LOG_LEVEL_WARNING 3
+#define LOG_LEVEL_DEBUG   4
 
 #include "Dump/Make_Dump.h"
 

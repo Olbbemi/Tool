@@ -67,7 +67,7 @@ namespace Olbbemi
 	private:
 		bool m_is_lock_on;
 		TCHAR m_file[30];
-		LONG m_thread_count;
+		WORD m_thread_count;
 		LARGE_INTEGER m_frequency;
 
 		static LONG s_index;
@@ -79,7 +79,7 @@ namespace Olbbemi
 		friend void Profile_End(const PTCHAR p_str);
 
 	public:
-		C_Profile(int pa_thread_count);
+		C_Profile(WORD pa_thread_count);
 		~C_Profile();
 
 		void M_Save();

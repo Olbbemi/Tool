@@ -17,7 +17,7 @@ C_Profile_Chunk** C_Profile::s_chunk = nullptr;
   * 프로파일링 객체내에는 여러 정보를 기록할 수 있는 구조체가 존재
   * 프로파일링 객체 개수를 생성자의 매개변수를 통해 입력받고 이 개수만큼 생성하여 사용 
   *------------------------------------------------------------------------------*/
-C_Profile::C_Profile(int pa_thread_count) : m_is_lock_on(true), m_file(_TEXT("Profile_"))
+C_Profile::C_Profile(WORD pa_thread_count) : m_is_lock_on(true), m_file(_TEXT("Profile_"))
 {
 	s_index = -1;	m_thread_count = pa_thread_count;
 	QueryPerformanceFrequency(&m_frequency);
@@ -32,13 +32,13 @@ C_Profile::C_Profile(int pa_thread_count) : m_is_lock_on(true), m_file(_TEXT("Pr
 
 	s_chunk = new C_Profile_Chunk*[pa_thread_count];
 
-	for (int i = 0; i < pa_thread_count; i++)
+	for (WORD i = 0; i < pa_thread_count; i++)
 		s_chunk[i] = new C_Profile_Chunk;
 }
 
 C_Profile::~C_Profile()
 {
-	for (int i = 0; i < m_thread_count; i++)
+	for (WORD i = 0; i < m_thread_count; i++)
 		delete s_chunk[i];
 
 	delete s_chunk;
@@ -79,7 +79,7 @@ void C_Profile::M_Save()
 	}
 	else if (m_is_lock_on == false && (GetAsyncKeyState(VK_HOME) & 0x0001))
 	{
-		int lo_thread_count = m_thread_count;
+		WORD lo_thread_count = m_thread_count;
 		M_GetTime();
 
 		_tfopen_s(&lo_output, m_file, _TEXT("w, ccs=UTF-16LE"));

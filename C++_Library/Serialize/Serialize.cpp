@@ -1,17 +1,19 @@
 #include "Precompile.h"
 #include "Log/Log.h"
 #include "Serialize.h"
+#include "Protocol/Define.h"
 
 #include <stdlib.h>
 #include <string.h>
+
 using namespace Olbbemi;
 
 C_MemoryPoolTLS<C_Serialize> C_Serialize::s_memory_pool(false);
 
-C_Serialize* C_Serialize::S_Alloc(int pa_head_size)
+C_Serialize* C_Serialize::S_Alloc()
 {
 	C_Serialize* lo_serialQ = s_memory_pool.M_Alloc();
-	lo_serialQ->M_InputHeaderSize(pa_head_size);
+	lo_serialQ->M_InputHeaderSize(MAX_HEAD_SIZE);
 	InterlockedIncrement(&lo_serialQ->m_ref_count);
 
 	return lo_serialQ;
@@ -21,7 +23,15 @@ void C_Serialize::S_Free(C_Serialize* pa_serialQ)
 {
 	LONG lo_ref_count = InterlockedDecrement(&pa_serialQ->m_ref_count);
 	if (lo_ref_count == 0)
+	{
+		pa_serialQ->m_is_encode = false;
 		s_memory_pool.M_Free(pa_serialQ);
+	}
+}
+
+void C_Serialize::S_Terminate()
+{
+	s_memory_pool.M_Terminate();
 }
 
 void C_Serialize::S_AddReference(C_Serialize* pa_serialQ)
@@ -46,6 +56,7 @@ LONG C_Serialize::S_TLSNodeCount()
 
 C_Serialize::C_Serialize()
 {
+	m_is_encode = false;
 	m_front = m_rear = 0;
 	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 
@@ -100,9 +111,15 @@ void C_Serialize::M_InputHeaderSize(int p_header_size)
 	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 }
 
-void C_Serialize::M_MakeHeader(const char *p_src, const int p_size)
+void C_Serialize::M_NetMakeHeader(const char *p_src, const int p_size)
 {
-	m_front = 0;
+	m_front = MAX_HEAD_SIZE - NET_HEAD_SIZE;
+	memcpy_s(m_buffer_ptr, SERIALIZE_BUFFER_SIZE, p_src, p_size);
+}
+
+void C_Serialize::M_LanMakeHeader(const char *p_src, const int p_size)
+{
+	m_front = MAX_HEAD_SIZE - LAN_HEAD_SIZE;
 	memcpy_s(m_buffer_ptr, SERIALIZE_BUFFER_SIZE, p_src, p_size);
 }
 

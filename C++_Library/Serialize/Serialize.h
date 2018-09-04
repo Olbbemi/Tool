@@ -81,6 +81,7 @@ namespace Olbbemi
 	class C_Serialize
 	{
 	private:
+		bool m_is_encode;
 		char* m_buffer_ptr;
 		int m_front, m_rear, m_maximum_size;
 		volatile LONG m_ref_count;
@@ -89,26 +90,30 @@ namespace Olbbemi
 
 		void M_Resize(const int pa_remain_size, const int pa_input_size);
 
+		friend class C_NetServer;
+
 	public:
 		C_Serialize();
 		~C_Serialize();
 
-		static C_Serialize* S_Alloc(int pa_head_size);
+		static C_Serialize* S_Alloc();
 		static void S_Free(C_Serialize* pa_serialQ);
 		static void S_AddReference(C_Serialize* pa_serialQ);
+		static void S_Terminate();
 		static LONG S_TLSAllocCount();
 		static LONG S_TLSChunkCount();
 		static LONG S_TLSNodeCount();
 
 		void M_Enqueue(char *pa_src, const int pa_size);
 		void M_Dequeue(char *pa_dest, const int pa_size);
-		
 
 		char* M_GetBufferPtr() const;
 		int M_GetUsingSize() const;
 		int M_GetUnusingSize() const;
 
-		void M_MakeHeader(const char *pa_src, const int pa_size);
+		void M_LanMakeHeader(const char *pa_src, const int pa_size);
+		void M_NetMakeHeader(const char *pa_src, const int pa_size);
+
 		void M_InputHeaderSize(const int pa_header_size);
 
 		void M_MoveFront(const int pa_size);

@@ -8,11 +8,11 @@
 
 using namespace Olbbemi;
 
-C_Parser::C_Parser() : m_index(2)
+C_Parser::C_Parser() : m_index(1)
 {
 	wifstream lo_read_stream;
 
-	lo_read_stream.open(_TEXT("test.txt"), ios_base::binary);
+	lo_read_stream.open(_TEXT("ChatServer.txt"), ios_base::binary);
 	lo_read_stream.imbue(locale(locale(""), new Unicodecvt));
 	lo_read_stream.seekg(0, lo_read_stream.end);
 
@@ -27,7 +27,7 @@ C_Parser::C_Parser() : m_index(2)
 
 void C_Parser::M_Initialize()
 {
-	m_index = m_index_store = 2;
+	m_index = m_index_store = 1;
 }
 
 void C_Parser::M_Make_KMP_Table(const TCHAR* pa_pivot)

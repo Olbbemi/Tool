@@ -6,11 +6,19 @@
 #include <string>
 using namespace std;
 
-struct ST_Player
+struct ST_PLAYER
 {
-	LONG xpos, ypos;
+	WORD xpos, ypos;
+	LONG pre_width_index, pre_height_index;
+	LONG cur_width_index, cur_height_index;
 	LONG64 account_no, session_id;
-	string id, nickname;
+	wstring id, nickname;
+
+	ST_PLAYER()
+	{
+		pre_width_index = -1;	pre_height_index = -1;
+		cur_width_index = -1;	cur_height_index = -1;
+	}
 };
 
 #endif

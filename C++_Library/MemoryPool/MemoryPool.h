@@ -289,6 +289,37 @@ namespace Olbbemi
 		}
 
 		/**-----------------------------------------------------------------------------------------------------------------------
+		  * 
+	  	  *-----------------------------------------------------------------------------------------------------------------------*/
+		~C_MemoryPoolTLS()
+		{
+			TlsFree(m_tls_index);
+
+			delete m_chunkpool;
+		}
+
+		/**-----------------------------------------------------------------------------------------------------------------------
+	  	  * 직렬화 버퍼를 사용하는 모든 쓰레드에서 해당 쓰레드가 종료될 때 호출하는 함수
+		  *-----------------------------------------------------------------------------------------------------------------------*/
+		void M_Terminate()
+		{
+			void* lo_tls_ptr = TlsGetValue(m_tls_index);
+			if (lo_tls_ptr == nullptr)
+				return;
+
+			BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
+			if (lo_check == 0)
+			{
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
+				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+			}
+
+			C_Chunk<T>* lo_chunk_ptr = ((C_Chunk<T>*)lo_tls_ptr)->m_node[((C_Chunk<T>*)lo_tls_ptr)->m_index].chunk_ptr;
+			m_chunkpool->M_Free(lo_chunk_ptr);
+		}
+
+		/**-----------------------------------------------------------------------------------------------------------------------
 		  * 현재 할당받은 TLS 가 비어 있다면 메모리 풀을 이용하여 Chunk 주소를 얻어와 저장 
 		  * TLS 내부에는 Chunk 주소가 저장되어 있고 각 Chunk 내부에는 반환될 데이터가 저장되어 있음
 		  * Alloc 함수가 호출될 때마다 Chunk 내부의 데이터를 반환하고 해당 Chunk에서 할당할 수 있는 데이터가 모두 소진된 경우 TLS를 비움 

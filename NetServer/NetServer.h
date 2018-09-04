@@ -22,7 +22,7 @@ namespace Olbbemi
 		{
 			volatile LONG v_send_flag, v_session_info[2]; // [0]: is_alive, [1]: io_count
 			volatile ULONG v_send_count;
-			LONGLONG session_id;
+			LONG64 session_id;
 			SOCKET socket;
 
 			C_Serialize* store_buffer[500];
@@ -48,7 +48,7 @@ namespace Olbbemi
 		BYTE m_workthread_count, m_packet_code, m_first_key, m_second_key;
 		WORD m_port;
 		DWORD m_max_session_count;
-		LONGLONG m_session_count;
+		LONG64 m_session_count, m_total_accept;
 
 		SOCKET m_listen_socket;
 		HANDLE m_iocp_handle, *m_thread_handle;
@@ -64,7 +64,13 @@ namespace Olbbemi
 
 		bool M_RecvPost(ST_Session* pa_session);
 		char M_SendPost(ST_Session* pa_session);
-		void M_Release(LONGLONG pa_session_id);
+		void M_Release(LONG64 pa_session_id);
+
+		void Encode(C_Serialize* pa_serialQ);
+		bool Decode(C_Serialize* pa_serialQ);
+
+		WORD SessionAcquireLock(LONG64 pa_session_id);
+		void SessionAcquireUnlock(LONG64 pa_session_id);
 
 		static unsigned int __stdcall M_AcceptThread(void* pa_argument);
 		static unsigned int __stdcall M_WorkerThread(void* pa_argument);
@@ -72,21 +78,22 @@ namespace Olbbemi
 	protected:
 		enum class E_LogState : BYTE
 		{
-			system = 0,
-			error,
+			error = 0,
 			warning,
 			debug
 		};
 
-		void M_SendPacket(LONGLONG pa_session_id, C_Serialize* pa_packet);
-		bool M_Disconnect(WORD pa_index);
+		void M_SendPacket(LONG64 pa_session_id, C_Serialize* pa_packet);
+		void M_Disconnect(LONG64 pa_index);
 
-		virtual void VIR_OnClientJoin(LONGLONG pa_session_id, TCHAR* pa_ip, WORD pa_port) = 0;
-		virtual void VIR_OnClientLeave(LONGLONG pa_session_id) = 0;
+		virtual void VIR_OnClose() = 0;
+		
+		virtual void VIR_OnClientJoin(LONG64 pa_session_id, TCHAR* pa_ip, WORD pa_port) = 0;
+		virtual void VIR_OnClientLeave(LONG64 pa_session_id) = 0;
 		virtual bool VIR_OnConnectionRequest(TCHAR* pa_ip, WORD pa_port) = 0;
 
-		virtual void VIR_OnRecv(LONGLONG pa_session_id, C_Serialize& pa_packet) = 0;
-		virtual void VIR_OnSend(LONGLONG pa_session_id, int pa_send_size) = 0;
+		virtual void VIR_OnRecv(LONG64 pa_session_id, C_Serialize* pa_packet) = 0;
+		virtual void VIR_OnSend(LONG64 pa_session_id, int pa_send_size) = 0;
 
 		virtual void VIR_OnWorkerThreadBegin() = 0;
 		virtual void VIR_OnWorkerThreadEnd() = 0;
@@ -97,10 +104,6 @@ namespace Olbbemi
 		bool M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session, BYTE pa_packet_code, BYTE pa_first_key, BYTE pa_second_key);
 		void M_Stop();
 
-		void Encode(C_Serialize* pa_serialQ);
-		bool Decode(C_Serialize* pa_serialQ);
-
-
 		LONG M_TLSPoolAllocCount();
 		LONG M_TLSPoolChunkCount();
 		LONG M_TLSPoolNodeCount();
@@ -110,6 +113,8 @@ namespace Olbbemi
 
 		LONG M_QueueAllocCount();
 		LONG M_QueueUseCount();
+
+		LONG64 M_TotalAcceptCount();
 	};
 }
 #endif
