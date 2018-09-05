@@ -7,9 +7,9 @@
 #include <unordered_map>
 using namespace std;
 
-#define TOTAL_GAME_SIZE 1000
-#define SECTOR_WIDTH_SIZE 50
-#define SECTOR_HEIGHT_SIZE 50
+#define TOTAL_GAME_SIZE 50
+#define SECTOR_WIDTH_SIZE 1
+#define SECTOR_HEIGHT_SIZE 1
 
 namespace Olbbemi 
 {

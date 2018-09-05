@@ -13,12 +13,6 @@ struct ST_PLAYER
 	LONG cur_width_index, cur_height_index;
 	LONG64 account_no, session_id;
 	wstring id, nickname;
-
-	ST_PLAYER()
-	{
-		pre_width_index = -1;	pre_height_index = -1;
-		cur_width_index = -1;	cur_height_index = -1;
-	}
 };
 
 #endif

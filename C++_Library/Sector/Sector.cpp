@@ -60,6 +60,8 @@ bool C_Sector::SetUnitSectorPosition(ST_PLAYER *p_session)
 		m_session_array[p_session->pre_height_index][p_session->pre_width_index].erase(p_session->session_id);
 		m_session_array[p_session->cur_height_index][p_session->cur_width_index].insert(make_pair(p_session->session_id, p_session));
 	}
+
+	return true;
 }
 
 /**----------------------------------------------------------------------------------------
@@ -69,9 +71,21 @@ void C_Sector::GetUnitTotalSector(ST_PLAYER *p_session, vector<ST_PLAYER*> &p_us
 {
 	pair<int, int> direction[8] = { {-1, 0},{-1, 1},{0, 1},{1, 1},{1, 0},{1, -1},{0, -1},{-1, -1} };
 	
+	bool flag = false;
+
 	int width_value = p_session->cur_width_index, height_value = p_session->cur_height_index;
 	for (auto user_list = m_session_array[height_value][width_value].begin(); user_list != m_session_array[height_value][width_value].end(); ++user_list)
+	{
 		p_user_list.push_back((*user_list).second);
+	
+		if (user_list->second == p_session)
+			flag = true;
+	}
+
+	if (flag == false)
+	{
+		printf("");
+	}
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -89,5 +103,6 @@ void C_Sector::GetUnitTotalSector(ST_PLAYER *p_session, vector<ST_PLAYER*> &p_us
   *--------------------------------------------------------*/
 void C_Sector::DeleteUnitSector(ST_PLAYER *p_session)
 {
-	m_session_array[p_session->cur_height_index][p_session->cur_width_index].erase(p_session->session_id);
+	if(p_session->cur_height_index != -1 && p_session->cur_width_index != -1)
+		m_session_array[p_session->cur_height_index][p_session->cur_width_index].erase(p_session->session_id);
 }

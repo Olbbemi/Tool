@@ -9,7 +9,7 @@
 #include <process.h>
 #include <strsafe.h>
 
-#define INDEX_VALUE 255
+#define INDEX_VALUE 65535
 #define IS_ALIVE 1
 #define IS_NOT_ALIVE 0
 
@@ -24,7 +24,8 @@ bool C_NetServer::M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip,
 {
 	TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
 
-	m_total_accept = 0;
+	m_total_accept = 0;	v_network_session_count = 0;
+	v_accept_tps = 0;	v_network_tps = 0;
 
 	m_session_count = 0;
 	m_is_nagle_on = pa_is_nagle_on;			m_workthread_count = pa_work_count;
@@ -258,11 +259,14 @@ unsigned int C_NetServer::M_Accept()
 		}
 
 		lo_avail_index = m_probable_index->M_Pop();
+		m_session_list[lo_avail_index].session_id = ((m_session_count << 16) | lo_avail_index);
+		InterlockedIncrement(&m_session_list[lo_avail_index].v_session_info[1]);
+		InterlockedExchange(&m_session_list[lo_avail_index].v_session_info[0], IS_ALIVE);
+
 		m_session_list[lo_avail_index].socket = lo_client_socket;	m_session_list[lo_avail_index].v_send_count = 0;
 		m_session_list[lo_avail_index].recvOver = new OVERLAPPED;	m_session_list[lo_avail_index].sendOver = new OVERLAPPED;
 		m_session_list[lo_avail_index].recvQ = new C_RINGBUFFER;	m_session_list[lo_avail_index].sendQ = new C_LFQueue<C_Serialize*>;
-		m_session_list[lo_avail_index].v_session_info[1] = 0;		m_session_list[lo_avail_index].session_id = ((m_session_count << 16) | lo_avail_index);
-		m_session_list[lo_avail_index].v_session_info[0] = IS_ALIVE;		m_session_list[lo_avail_index].v_send_flag = FALSE;
+		m_session_list[lo_avail_index].v_send_flag = FALSE;
 		m_session_count++;
 
 		lo_iocp_check = M_MatchIOCPHandle(lo_client_socket, &m_session_list[lo_avail_index]);
@@ -275,16 +279,21 @@ unsigned int C_NetServer::M_Accept()
 			continue;
 		}
 
-		InterlockedIncrement(&m_session_list[lo_avail_index].v_session_info[1]);
-
 		VIR_OnClientJoin(m_session_list[lo_avail_index].session_id, lo_confirm_ip, lo_confirm_port);
 		M_RecvPost(&m_session_list[lo_avail_index]);
 
 		m_total_accept++;
+		InterlockedIncrement(&v_network_session_count);
+		InterlockedIncrement(&v_accept_tps);
 
 		LONG interlock_value = InterlockedDecrement(&m_session_list[lo_avail_index].v_session_info[1]);
 		if (interlock_value == 0)
 			M_Release(m_session_list[lo_avail_index].session_id);
+		else if (interlock_value < 0)
+		{
+			ST_Log lo_log({ "IO Count is Nagative: " + to_string(interlock_value) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+		}
 	}
 
 	WSACleanup();
@@ -317,6 +326,7 @@ unsigned int C_NetServer::M_PacketProc()
 		{
 			C_Serialize::S_Terminate();
 			PostQueuedCompletionStatus(m_iocp_handle, 0, 0, 0);
+
 			break;
 		}
 		else if (lo_overlap == nullptr)
@@ -358,6 +368,8 @@ unsigned int C_NetServer::M_PacketProc()
 					C_Serialize::S_Free(lo_serialQ);
 					break;
 				}
+
+				InterlockedIncrement(&v_network_tps);
 
 				C_Serialize::S_AddReference(lo_serialQ);
 				VIR_OnRecv(lo_session->session_id, lo_serialQ);
@@ -465,38 +477,34 @@ bool C_NetServer::Decode(C_Serialize* pa_serialQ)
   * 해당 세션이 이미 Release 단계에 들어간 경우에는 패킷 전송 및 세션 종료를하면 안되므로 interlock을 통하여 확인
   * 이미 Release 단계로 들어갔다면 0을 반환 [ 세션 배열에서 0은 사용하지 않음 ]
   *---------------------------------------------------------------------------------------------------------*/
-WORD C_NetServer::SessionAcquireLock(LONG64 pa_session_id)
+bool C_NetServer::SessionAcquireLock(LONG64 pa_session_id, WORD& pa_index)
 {
 	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
-	LONG64 lo_id = (pa_session_id >> 16);
+	pa_index = lo_index;
 
-	if (m_session_list[lo_index].session_id != pa_session_id)
-		return 0;
-	
 	InterlockedIncrement(&m_session_list[lo_index].v_session_info[1]);
-	if (InterlockedCompareExchange(&m_session_list[lo_index].v_session_info[0], IS_NOT_ALIVE, IS_NOT_ALIVE) == IS_NOT_ALIVE)
-	{
-		LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
-		if (lo_count == 0)
-			M_Release(pa_session_id);
-		return 0;
-	}
+	if (m_session_list[lo_index].v_session_info[0] != IS_ALIVE || m_session_list[lo_index].session_id != pa_session_id)
+		return false;
 
-	return lo_index;
+	return true;
 }
 
 /**--------------------------------------------------------------------------------
   * SessionAcquireLock 함수와 한 쌍을 이루는 함수
   * 위 함수를 호출한 위치의 마지막에는 SesseionAcquireUnlock 함수를 꼭 호출해주어야 함
   *--------------------------------------------------------------------------------*/
-void C_NetServer::SessionAcquireUnlock(LONG64 pa_session_id)
+void C_NetServer::SessionAcquireUnlock(LONG64 pa_session_id, WORD pa_index)
 {
-	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
-	LONG64 lo_id = (pa_session_id >> 16);
-
-	LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
+	LONG lo_count = InterlockedDecrement(&m_session_list[pa_index].v_session_info[1]);
 	if (lo_count == 0)
 		M_Release(pa_session_id);
+	else if (lo_count < 0)
+	{
+		TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+
+		ST_Log lo_log({ "IO Count is Nagative: " + to_string(lo_count) });
+		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+	}
 }
 
 /**---------------------------------------------------------
@@ -504,10 +512,25 @@ void C_NetServer::SessionAcquireUnlock(LONG64 pa_session_id)
   *---------------------------------------------------------*/
 void C_NetServer::M_SendPacket(LONG64 pa_session_id, C_Serialize* pa_packet)
 {
-	WORD lo_index = SessionAcquireLock(pa_session_id);
-	if (lo_index == 0)
+	bool lo_check;
+	WORD lo_index;
+	
+	lo_check = SessionAcquireLock(pa_session_id, lo_index);
+	if (lo_check == false)
 	{
 		C_Serialize::S_Free(pa_packet);
+
+		LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
+		if (lo_count == 0)
+			M_Release(pa_session_id);
+		else if (lo_count < 0)
+		{
+			TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+
+			ST_Log lo_log({ "IO Count is Nagative: " + to_string(lo_count) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+		}
+		
 		return;
 	}
 		
@@ -519,7 +542,7 @@ void C_NetServer::M_SendPacket(LONG64 pa_session_id, C_Serialize* pa_packet)
 	M_SendPost(&m_session_list[lo_index]);
 	C_Serialize::S_Free(pa_packet);
 
-	SessionAcquireUnlock(pa_session_id);
+	SessionAcquireUnlock(pa_session_id, lo_index);
 }
 
 /**-----------------------------------------------------------------------------------------------------------------------------
@@ -529,12 +552,28 @@ void C_NetServer::M_SendPacket(LONG64 pa_session_id, C_Serialize* pa_packet)
   *-----------------------------------------------------------------------------------------------------------------------------*/
 void C_NetServer::M_Disconnect(LONG64 pa_session_id)
 {
-	WORD lo_index = SessionAcquireLock(pa_session_id);
-	if (lo_index == 0)
-		return;
+	bool lo_check;
+	WORD lo_index;
 	
+	lo_check = SessionAcquireLock(pa_session_id, lo_index);
+	if (lo_check == false)
+	{
+		LONG lo_count = InterlockedDecrement(&m_session_list[lo_index].v_session_info[1]);
+		if (lo_count == 0)
+			M_Release(pa_session_id);
+		else if (lo_count < 0)
+		{
+			TCHAR lo_action[] = _TEXT("NetServer"), lo_server[] = _TEXT("ChatServer");
+
+			ST_Log lo_log({ "IO Count is Nagative: " + to_string(lo_count) });
+			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
+		}
+
+		return;
+	}
+		
 	shutdown(m_session_list[lo_index].socket, SD_BOTH);
-	SessionAcquireUnlock(pa_session_id);
+	SessionAcquireUnlock(pa_session_id, lo_index);
 }
 
 /**---------------------------------------
@@ -643,20 +682,16 @@ char C_NetServer::M_SendPost(ST_Session* pa_session)
 void C_NetServer::M_Release(LONG64 pa_session_id)
 {
 	WORD lo_index = (WORD)(pa_session_id & INDEX_VALUE);
-
-	LONG lo_session_info[2];
-	lo_session_info[0] = m_session_list[lo_index].v_session_info[0];
-	lo_session_info[1] = m_session_list[lo_index].v_session_info[1];
-
-	if (InterlockedCompareExchange64((LONG64*)m_session_list[lo_index].v_session_info, IS_NOT_ALIVE, *((LONG64*)lo_session_info)) != *((LONG64*)lo_session_info))
+	
+	if (InterlockedCompareExchange64((LONG64*)m_session_list[lo_index].v_session_info, IS_NOT_ALIVE, IS_ALIVE) != IS_ALIVE)
 		return;
 
-	VIR_OnClientLeave(pa_session_id);
+	InterlockedDecrement(&v_network_session_count);
 
 	int lo_count = m_session_list[lo_index].v_send_count;
-	for (int i = 0; i < lo_count; i++)
+	for (int i = 0; i < lo_count; i++)	
 		C_Serialize::S_Free(m_session_list[lo_index].store_buffer[i]);
-
+	
 	int lo_sendQ_count = m_session_list[lo_index].sendQ->M_GetUseCount();
 	if (lo_sendQ_count != 0)
 	{
@@ -673,14 +708,14 @@ void C_NetServer::M_Release(LONG64 pa_session_id)
 	m_session_list[lo_index].recvOver = nullptr; m_session_list[lo_index].sendOver = nullptr;
 	m_session_list[lo_index].recvQ = nullptr;	 m_session_list[lo_index].sendQ = nullptr;
 
-
 	closesocket(m_session_list[lo_index].socket);
 	m_session_list[lo_index].v_session_info[0] = false;
 
 	m_probable_index->M_Push(lo_index);
+	VIR_OnClientLeave(pa_session_id);
 }
 
-//============================================================================================================//
+//============================================================================================================
 
 /**---------------------------------
   * 서버에서 관제용으로 출력하는 함수
@@ -711,31 +746,22 @@ LONG C_NetServer::M_StackUseCount()
 	return m_probable_index->M_GetUseCount();
 }
 
-LONG C_NetServer::M_QueueAllocCount()
-{
-	LONG return_value = 0;
-	for (int i = 0; i < m_max_session_count; i++)
-	{
-		if (m_session_list[i].v_session_info[0] == IS_ALIVE)
-			return_value += m_session_list[i].sendQ->M_GetAllocCount();
-	}
-
-	return return_value;
-}
-
-LONG C_NetServer::M_QueueUseCount()
-{
-	LONG return_value = 0;
-	for (int i = 0; i < m_max_session_count; i++)
-	{
-		if (m_session_list[i].v_session_info[0] == IS_ALIVE)
-			return_value += m_session_list[i].sendQ->M_GetUseCount();
-	}
-
-	return return_value;
-}
-
 LONG64 C_NetServer::M_TotalAcceptCount()
 {
 	return m_total_accept;
+}
+
+LONG C_NetServer::M_AcceptTPS()
+{
+	return v_accept_tps;
+}
+
+LONG C_NetServer::M_NetworkTPS()
+{
+	return v_network_tps;
+}
+
+LONG C_NetServer::M_NetworkAcceptCount()
+{
+	return v_network_session_count;
 }

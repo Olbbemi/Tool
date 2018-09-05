@@ -69,8 +69,8 @@ namespace Olbbemi
 		void Encode(C_Serialize* pa_serialQ);
 		bool Decode(C_Serialize* pa_serialQ);
 
-		WORD SessionAcquireLock(LONG64 pa_session_id);
-		void SessionAcquireUnlock(LONG64 pa_session_id);
+		bool SessionAcquireLock(LONG64 pa_session_id, WORD& pa_index);
+		void SessionAcquireUnlock(LONG64 pa_session_id, WORD pa_index);
 
 		static unsigned int __stdcall M_AcceptThread(void* pa_argument);
 		static unsigned int __stdcall M_WorkerThread(void* pa_argument);
@@ -101,6 +101,9 @@ namespace Olbbemi
 		virtual void VIR_OnError(int pa_line, TCHAR* pa_action, E_LogState pa_log_level, ST_Log* pa_log) = 0;
 
 	public:
+
+		volatile LONG v_accept_tps, v_network_tps, v_network_session_count;
+
 		bool M_Start(bool pa_is_nagle_on, BYTE pa_work_count, TCHAR* pa_ip, WORD pa_port, DWORD pa_max_session, BYTE pa_packet_code, BYTE pa_first_key, BYTE pa_second_key);
 		void M_Stop();
 
@@ -111,10 +114,12 @@ namespace Olbbemi
 		LONG M_StackAllocCount();
 		LONG M_StackUseCount();
 
-		LONG M_QueueAllocCount();
-		LONG M_QueueUseCount();
-
+		LONG M_AcceptTPS();
+		LONG M_NetworkTPS();
+		LONG M_NetworkAcceptCount();
 		LONG64 M_TotalAcceptCount();
+		
+
 	};
 }
 #endif

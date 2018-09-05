@@ -12,7 +12,7 @@ C_Parser::C_Parser() : m_index(1)
 {
 	wifstream lo_read_stream;
 
-	lo_read_stream.open(_TEXT("ChatServer.txt"), ios_base::binary);
+	lo_read_stream.open(_TEXT("ChatServer.ini"), ios_base::binary);
 	lo_read_stream.imbue(locale(locale(""), new Unicodecvt));
 	lo_read_stream.seekg(0, lo_read_stream.end);
 

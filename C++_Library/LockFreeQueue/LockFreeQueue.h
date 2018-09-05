@@ -45,7 +45,7 @@ namespace Olbbemi
 		  *-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 		C_LFQueue()
 		{
-			m_pool = new C_MemoryPool<ST_Node>(1000, false);
+			m_pool = new C_MemoryPool<ST_Node>(50, false);
 			
 			m_front.block_info[0] = (LONG64)m_pool->M_Alloc();	
 			m_front.block_info[1] = 1;
