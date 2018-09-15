@@ -50,45 +50,46 @@ namespace Olbbemi
 		  *---------------------------------------------------------------*/
 		struct ST_Top
 		{
-			volatile __int64 block_info[2];
+			ST_Node* node_address;
+			LONG64   unique_index;
 		};
 
 		bool m_is_placementnew;
 		LONG m_use_count, m_alloc_count, m_max_alloc_count;
 		HANDLE m_heap_handle;
-		__declspec(align(16)) ST_Top m_pool_top;
+		volatile __declspec(align(16)) ST_Top m_pool_top;
 
 		void M_Push(ST_Node* pa_new_node)
 		{
-			__int64 lo_top;
+			ST_Node* lo_top;
 
 			do
 			{
-				lo_top = m_pool_top.block_info[0];
-				pa_new_node->next_node = (ST_Node*)lo_top;
-			} while (InterlockedCompareExchange64((LONG64*)&m_pool_top.block_info[0], (LONG64)pa_new_node, lo_top) != lo_top);
+				lo_top = m_pool_top.node_address;
+				pa_new_node->next_node = lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_pool_top.node_address, (LONG64)pa_new_node, (LONG64)lo_top) != (LONG64)lo_top);
 		}
 
 		T* M_Pop()
 		{
-			__declspec(align(16)) __int64 lo_top[2];
+			__declspec(align(16)) ST_Top lo_top;
 			ST_Node* lo_next = nullptr;
 
 			do
 			{
-				lo_top[1] = m_pool_top.block_info[1];
-				lo_top[0] = m_pool_top.block_info[0];
+				lo_top.unique_index = m_pool_top.unique_index;
+				lo_top.node_address = m_pool_top.node_address;
 				
-				if (lo_top[0] == 0)
+				if (lo_top.node_address == nullptr)
 					return nullptr;
 
-				lo_next = ((ST_Node*)lo_top[0])->next_node;
-			} while (InterlockedCompareExchange128(m_pool_top.block_info, lo_top[1] + 1, (LONG64)lo_next, lo_top) == 0);
+				lo_next = lo_top.node_address->next_node;
+			} while (InterlockedCompareExchange128((LONG64*)&m_pool_top, lo_top.unique_index + 1, (LONG64)lo_next, (LONG64*)&lo_top) == 0);
 
 			if (m_is_placementnew == true)
-				new((ST_Node*)lo_top[0]) ST_Node();
+				new(lo_top.node_address) ST_Node();
 
-			return &(((ST_Node*)(lo_top[0]))->instance);
+			return &(lo_top.node_address->instance);
 		}
 
 	public:
@@ -111,7 +112,7 @@ namespace Olbbemi
 
 			m_max_alloc_count = pa_max_alloc_count;		m_is_placementnew = pa_is_placement_new;
 			m_use_count = 0;							m_alloc_count = 0;
-			m_pool_top.block_info[0] = 0;				m_pool_top.block_info[1] = 1;
+			m_pool_top.node_address = nullptr;			m_pool_top.unique_index = 1;
 
 			if (pa_max_alloc_count != 0)
 			{
@@ -137,13 +138,13 @@ namespace Olbbemi
 			int lo_free_check;
 			ST_Node* lo_garbage;
 
-			while (m_pool_top.block_info[0] != 0)
+			while (m_pool_top.node_address != nullptr)
 			{
-				lo_garbage = (ST_Node*)m_pool_top.block_info[0];
+				lo_garbage = (ST_Node*)m_pool_top.node_address;
 				if (m_is_placementnew == false)
 					lo_garbage->instance.~T();
 
-				m_pool_top.block_info[0] = (LONG64)(((ST_Node*)m_pool_top.block_info[0])->next_node);
+				m_pool_top.node_address = m_pool_top.node_address->next_node;
 				InterlockedDecrement(&m_alloc_count);
 
 				lo_free_check = HeapFree(m_heap_handle, 0, lo_garbage);
@@ -174,7 +175,7 @@ namespace Olbbemi
 			T* return_value;
 			while (1)
 			{
-				if (m_pool_top.block_info[0] == 0)
+				if (m_pool_top.node_address == nullptr)
 				{
 					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
 					if (m_is_placementnew == false)

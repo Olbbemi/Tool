@@ -81,7 +81,7 @@ namespace Olbbemi
 	class C_Serialize
 	{
 	private:
-		bool m_is_encode;
+		bool m_encode_enable;
 		char* m_buffer_ptr;
 		int m_front, m_rear, m_maximum_size;
 		volatile LONG m_ref_count;

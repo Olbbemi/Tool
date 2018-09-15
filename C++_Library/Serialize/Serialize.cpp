@@ -13,8 +13,7 @@ C_MemoryPoolTLS<C_Serialize> C_Serialize::s_memory_pool(false);
 C_Serialize* C_Serialize::S_Alloc()
 {
 	C_Serialize* lo_serialQ = s_memory_pool.M_Alloc();
-	lo_serialQ->M_InputHeaderSize(MAX_HEAD_SIZE);
-	InterlockedIncrement(&lo_serialQ->m_ref_count);
+	lo_serialQ->m_ref_count = 1;
 
 	return lo_serialQ;
 }
@@ -24,7 +23,9 @@ void C_Serialize::S_Free(C_Serialize* pa_serialQ)
 	LONG lo_ref_count = InterlockedDecrement(&pa_serialQ->m_ref_count);
 	if (lo_ref_count == 0)
 	{
-		pa_serialQ->m_is_encode = false;
+		pa_serialQ->m_encode_enable = true;
+		pa_serialQ->m_front = pa_serialQ->m_rear = MAX_HEAD_SIZE;
+		
 		s_memory_pool.M_Free(pa_serialQ);
 	}
 }
@@ -56,8 +57,8 @@ LONG C_Serialize::S_TLSNodeCount()
 
 C_Serialize::C_Serialize()
 {
-	m_is_encode = false;
-	m_front = m_rear = 0;
+	m_encode_enable = true;
+	m_front = m_rear = MAX_HEAD_SIZE;
 	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 
 	m_buffer_ptr = (char*)malloc(SERIALIZE_BUFFER_SIZE);
@@ -114,13 +115,13 @@ void C_Serialize::M_InputHeaderSize(int p_header_size)
 void C_Serialize::M_NetMakeHeader(const char *p_src, const int p_size)
 {
 	m_front = MAX_HEAD_SIZE - NET_HEAD_SIZE;
-	memcpy_s(m_buffer_ptr, SERIALIZE_BUFFER_SIZE, p_src, p_size);
+	memcpy_s(m_buffer_ptr + m_front, SERIALIZE_BUFFER_SIZE, p_src, p_size);
 }
 
 void C_Serialize::M_LanMakeHeader(const char *p_src, const int p_size)
 {
 	m_front = MAX_HEAD_SIZE - LAN_HEAD_SIZE;
-	memcpy_s(m_buffer_ptr, SERIALIZE_BUFFER_SIZE, p_src, p_size);
+	memcpy_s(m_buffer_ptr + m_front, SERIALIZE_BUFFER_SIZE, p_src, p_size);
 }
 
 void C_Serialize::M_Enqueue(char *p_src, const int p_size)

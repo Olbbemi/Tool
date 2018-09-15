@@ -30,11 +30,12 @@ namespace Olbbemi
 		  *-------------------------------------------------------------------*/
 		struct ST_Top
 		{
-			volatile LONG64 block_info[2];
+			ST_Node* node_address;
+			LONG64   unique_index;
 		};
 
 		volatile LONG m_stack_size;
-		__declspec(align(16)) ST_Top m_top;
+		volatile __declspec(align(16)) ST_Top m_top;
 		C_MemoryPool<ST_Node> *m_pool;
 
 	public:
@@ -43,8 +44,8 @@ namespace Olbbemi
 		{
 			m_pool = new C_MemoryPool<ST_Node>(0, false);
 
-			m_top.block_info[0] = 0;
-			m_top.block_info[1] = 1;
+			m_top.node_address = nullptr;
+			m_top.unique_index = 1;
 		}
 
 		/**---------------------------------------------------------------------
@@ -54,11 +55,11 @@ namespace Olbbemi
 		~C_LFStack()
 		{
 			ST_Node* lo_garbage;
-			while (m_top.block_info[0] != 0)
+			while (m_top.node_address != nullptr)
 			{
 				m_stack_size--;
-				lo_garbage = (ST_Node*)m_top.block_info[0];
-				m_top.block_info[0] = (LONG64)(((ST_Node*)m_top.block_info[0])->link);
+				lo_garbage = m_top.node_address;
+				m_top.node_address = m_top.node_address->link;
 				m_pool->M_Free(lo_garbage);
 			}
 
@@ -70,15 +71,14 @@ namespace Olbbemi
 		  *----------------------------------------------------------------------------*/
 		void M_Push(T pa_data)
 		{
-			LONG64 lo_top;
-			ST_Node* new_node = m_pool->M_Alloc();
+			ST_Node *lo_top, *new_node = m_pool->M_Alloc();
 			new_node->data = pa_data;	new_node->link = nullptr;
 
 			do
 			{
-				lo_top = m_top.block_info[0];
-				new_node->link = (ST_Node*)lo_top;
-			} while (InterlockedCompareExchange64((LONG64*)&m_top.block_info, (LONG64)new_node, lo_top) != lo_top);
+				lo_top = m_top.node_address;
+				new_node->link = lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_top, (LONG64)new_node, (LONG64)lo_top) != (LONG64)lo_top);
 
 			InterlockedIncrement(&m_stack_size);
 		}
@@ -96,19 +96,19 @@ namespace Olbbemi
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
-			__declspec(align(16)) LONG64 lo_top[2];
+			__declspec(align(16)) ST_Top lo_top;
 			T lo_return_value;
 			ST_Node* lo_next = nullptr;
 
 			do
 			{
-				lo_top[1] = m_top.block_info[1];
-				lo_top[0] = m_top.block_info[0];
+				lo_top.unique_index = m_top.unique_index;
+				lo_top.node_address = m_top.node_address;
 
-				lo_return_value = ((ST_Node*)(lo_top[0]))->data;
-			} while (InterlockedCompareExchange128(m_top.block_info, lo_top[1] + 1, (LONG64)((ST_Node*)lo_top[0])->link, lo_top) == 0);
+				lo_return_value = lo_top.node_address->data;
+			} while (InterlockedCompareExchange128((LONG64*)&m_top, lo_top.unique_index + 1, (LONG64)lo_top.node_address->link, (LONG64*)&lo_top) == 0);
 
-			m_pool->M_Free((ST_Node*)lo_top[0]);
+			m_pool->M_Free(lo_top.node_address);
 			return lo_return_value;
 		}
 
