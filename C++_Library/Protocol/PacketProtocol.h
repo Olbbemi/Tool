@@ -236,13 +236,7 @@ enum en_PACKET_TYPE
 	//
 	//------------------------------------------------------------
 	en_PACKET_SS_RES_NEW_CLIENT_LOGIN,
-
-
-
-
 };
-
-
 
 enum en_PACKET_CS_LOGIN_RES_LOGIN
 {

@@ -74,6 +74,8 @@ namespace Olbbemi
 		static DWORD s_tls_index;
 		static C_Profile_Chunk** s_chunk;
 
+		static C_Profile_Chunk* S_Alloc();
+
 		friend class C_Profile_Chunk;
 		friend void Profile_Begin(const PTCHAR p_str, int p_line);
 		friend void Profile_End(const PTCHAR p_str);
@@ -84,8 +86,6 @@ namespace Olbbemi
 
 		void M_Save();
 		void M_GetTime();
-
-		static C_Profile_Chunk* S_Alloc();
 	};
 
 	void Profile_Begin(const PTCHAR pa_str, int pa_line);

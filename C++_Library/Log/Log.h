@@ -3,9 +3,10 @@
 
 #define LOG_LEVEL_POWER	  0
 #define LOG_LEVEL_SYSTEM  1
-#define LOG_LEVEL_ERROR   2
-#define LOG_LEVEL_WARNING 3
-#define LOG_LEVEL_DEBUG   4
+#define LOG_LEVEL_DB	  2
+#define LOG_LEVEL_ERROR   3
+#define LOG_LEVEL_WARNING 4
+#define LOG_LEVEL_DEBUG   5
 
 #include "Dump/Make_Dump.h"
 
@@ -60,6 +61,13 @@ public:
 };
 
 #define _MAKEDIR(pa_path)	C_Log::S_MakeDirectory(pa_path);
+
+//#define _DBLOG()	\
+//	do              \
+//	{               \
+//                  \
+//	} while (0)     \
+
 
 #define _LOG(pa_line, pa_log_level, pa_action, pa_server, pa_str_count, pa_error_str)						\
 	do																										\
