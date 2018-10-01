@@ -73,6 +73,8 @@ namespace Olbbemi
 		}
 	};
 
+	class C_NetServer;
+
 	/**-------------------------------------------------------------------
 	  * 직렬화 버퍼의 재사용 및 속도를 위해 TLS를 사용하는 MemoryPool 을 이용
 	  * 해당 직렬화 버퍼를 참조할 때마다 S_AddReference 함수를 통해 해당 직렬화 버퍼의 사용 카운트를 증가
@@ -81,7 +83,7 @@ namespace Olbbemi
 	class C_Serialize
 	{
 	private:
-		bool m_encode_enable;
+		bool m_encode_enable, m_send_and_disconnect;
 		char* m_buffer_ptr;
 		int m_front, m_rear, m_maximum_size;
 		volatile LONG m_ref_count;
@@ -111,10 +113,10 @@ namespace Olbbemi
 		int M_GetUsingSize() const;
 		int M_GetUnusingSize() const;
 
+		void M_SendAndDisconnect();
+
 		void M_LanMakeHeader(const char *pa_src, const int pa_size);
 		void M_NetMakeHeader(const char *pa_src, const int pa_size);
-
-		void M_InputHeaderSize(const int pa_header_size);
 
 		void M_MoveFront(const int pa_size);
 		void M_MoveRear(const int pa_size);

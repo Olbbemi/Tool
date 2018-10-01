@@ -7,13 +7,36 @@
 
 #include <vector>
 #include <string>
-#include <initializer_list>
+
+#pragma comment(lib, "lib/vs14/mysqlclient.lib")
 
 using namespace std;
 
 namespace Olbbemi
 {
-	class C_DBConnector;
+	class C_DBConnector
+	{
+	private:
+		TCHAR m_log_action[20], m_log_server[20];
+
+		char m_DB_ip[16], m_DB_user[64], m_DB_password[64], m_DB_name[64], m_last_error_msg[128];
+		int m_DB_port, m_last_error;
+
+		MYSQL m_mysql, *m_connection;
+		MYSQL_RES* m_sql_result;
+
+		void M_Initialize(TCHAR* pa_DB_ip, TCHAR* pa_DB_user, TCHAR* pa_DB_password, TCHAR* pa_DB_name, int pa_DB_port);
+		void M_Connect();
+
+		friend class C_DBConnectTLS;
+
+	public:
+		C_DBConnector();
+		~C_DBConnector();
+
+		void M_Query(bool pa_is_write, vector<MYSQL_ROW>& pa_sql_row, string pa_string_format, int pa_count, ...);
+		void M_FreeResult();
+	};
 	 
 	class C_DBConnectTLS
 	{
@@ -28,33 +51,6 @@ namespace Olbbemi
 		~C_DBConnectTLS();
 
 		C_DBConnector* M_GetPtr();
-	};
-
-
-	class C_DBConnector
-	{
-	private:
-		char m_DB_ip[16], m_DB_user[64], m_DB_password[64], m_DB_name[64], m_last_error_msg[128];
-		int m_DB_port, m_last_error;
-
-		MYSQL m_mysql, *m_connection;
-		MYSQL_RES* m_sql_result;
-
-		void M_Initialize(TCHAR* pa_DB_ip, TCHAR* pa_DB_user, TCHAR* pa_DB_password, TCHAR* pa_DB_name, int pa_DB_port);
-
-		bool M_Connect();
-		bool M_Disconnect();
-
-		int	M_GetLastErrorNo();
-		char* M_GetLastErrorMsg();
-
-		friend class C_DBConnectTLS;
-
-	public:
-		~C_DBConnector();
-
-		bool M_Query(string pa_string_format, initializer_list<LONG64> pa_init_list, vector<MYSQL_ROW>& pa_sql_row, bool pa_is_write = false);
-		void M_FreeResult();
 	};
 }
 

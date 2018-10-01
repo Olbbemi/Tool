@@ -48,47 +48,53 @@ void C_Log::S_PrintLog(int pa_line, BYTE pa_log_level, TCHAR* pa_action, TCHAR* 
 	cur_time = time(NULL);
 	localtime_s(&time_info, &cur_time);
 
-	StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_Log.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
-	_tfopen_s(&input, file_name, _TEXT("a"));
-
 	switch (pa_log_level)
 	{
-	case LOG_LEVEL_POWER:
-		StringCchPrintf(log_buffer, 30, _TEXT("Status: -----POWER"));
-		_ftprintf(input, _TEXT("%s\n"), log_buffer);
-		break;
+		case LOG_LEVEL_POWER:
+			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----POWER"));
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_PowerLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
+			break;
 
 		case LOG_LEVEL_SYSTEM:
 			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----SYSTEM"));
-			_ftprintf(input, _TEXT("%s\n"), log_buffer);
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_SystemLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
+			break;
+
+		case LOG_LEVEL_QUERY:
+			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----Query"));
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_QueryLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 			break;
 
 		case LOG_LEVEL_ERROR:
 			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----ERROR"));
-			_ftprintf(input, _TEXT("%s\n"), log_buffer);
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_ErrorLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 			break;
 	
 		case LOG_LEVEL_WARNING:
 			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----WARNING"));
-			_ftprintf(input, _TEXT("%s\n"), log_buffer);
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_WarningLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 			break;
 	
 		case LOG_LEVEL_DEBUG:
 			StringCchPrintf(log_buffer, 30, _TEXT("Status: -----DEBUG"));
-			_ftprintf(input, _TEXT("%s\n"), log_buffer);
+			StringCchPrintf(file_name, 100, _TEXT("%s/%s_%04d%02d%02d_DebugLog.txt"), m_dir_path, pa_server, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday);
 			break;
 	}
 
 	StringCchPrintf(output_buffer, 100, _TEXT("-----[%s]   [Line:%d] %04d/%02d/%02d_%02d:%02d:%02d   [%I64u%]-----"), pa_action, pa_line, time_info.tm_year + 1900, time_info.tm_mon + 1, time_info.tm_mday, time_info.tm_hour, time_info.tm_min, time_info.tm_sec, InterlockedIncrement64(&m_count));
+
+	_tfopen_s(&input, file_name, _TEXT("a"));
+	_ftprintf(input, _TEXT("%s\n"), log_buffer);
 	_ftprintf(input, _TEXT("%s\n"), output_buffer);
 
 	for (int i = 0; i < pa_str_count; i++)
 		fprintf(input, "%s\n", pa_error_str[i].c_str());
-	
+	fprintf(input, "\n");
+
 	fclose(input);
 	ReleaseSRWLockExclusive(&m_log_srwLock);
 
-	if (pa_log_level == LOG_LEVEL_SYSTEM)
+	if (pa_log_level == LOG_LEVEL_SYSTEM || pa_log_level == LOG_LEVEL_QUERY)
 		g_dump.S_MakeCrash();
 }
 

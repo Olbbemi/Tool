@@ -2,7 +2,7 @@
 using System.Text;
 using System.Diagnostics;
 
-namespace LOG
+namespace Log
 {
     /*
          로그를 남길 파일에 필요한 헤더 및 함수
@@ -13,7 +13,7 @@ namespace LOG
             => 3번의 GetFileLineNumber() 함수가 반환하는 값은 2번이 할당된 위치이므로 로그를 남길때마다 2번을 호출해주어야 함
     */
 
-    static class Log
+    static public class C_LogClass
     {
         public enum LOG_STATE : Byte
         {
@@ -25,7 +25,7 @@ namespace LOG
         static public Byte m_log_level;
         static private string m_log_name;
 
-        static Log()
+        static C_LogClass()
         {
             m_log_level = (Byte)LOG_STATE.e_debug;
 

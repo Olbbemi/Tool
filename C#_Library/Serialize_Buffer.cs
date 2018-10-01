@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace SERIALIZE_BUFFER
+namespace SerializeBuffer
 {
-    class SerializeBuffer
+    class C_SerializeBuffer
     {
         private byte[] m_buffer;
         private Int32 m_front, m_rear;
@@ -16,7 +16,7 @@ namespace SERIALIZE_BUFFER
         /*
             직렬화버퍼 초기화 및 사용할 패킷의 헤더 크기만큼 공간 비워두는 용도로 정의 
         */
-        public SerializeBuffer(Int32 p_header_size)
+        public C_SerializeBuffer(Int32 p_header_size)
         {
             m_buffer = new byte[(Int32)Initial_Value.en_buffer_size];
             m_front = m_rear = p_header_size;

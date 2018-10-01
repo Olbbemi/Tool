@@ -24,6 +24,8 @@ void C_Serialize::S_Free(C_Serialize* pa_serialQ)
 	if (lo_ref_count == 0)
 	{
 		pa_serialQ->m_encode_enable = true;
+		pa_serialQ->m_send_and_disconnect = false;
+
 		pa_serialQ->m_front = pa_serialQ->m_rear = MAX_HEAD_SIZE;
 		
 		s_memory_pool.M_Free(pa_serialQ);
@@ -58,13 +60,15 @@ LONG C_Serialize::S_TLSNodeCount()
 C_Serialize::C_Serialize()
 {
 	m_encode_enable = true;
+	m_send_and_disconnect = false;
+
 	m_front = m_rear = MAX_HEAD_SIZE;
 	m_maximum_size = SERIALIZE_BUFFER_SIZE;
 
 	m_buffer_ptr = (char*)malloc(SERIALIZE_BUFFER_SIZE);
 	if (m_buffer_ptr == nullptr)
 	{
-		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("NONE");
+		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("Common");
 		ST_Log lo_log({"Seiralize Malloc Fail"});
 
 		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
@@ -84,7 +88,7 @@ void C_Serialize::M_Resize(int p_remain_size, int p_input_size)
 	char* temp_buffer = (char*)malloc(m_maximum_size);
 	if (temp_buffer == nullptr)
 	{
-		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("NONE");
+		TCHAR lo_action[] = _TEXT("SERIALIZE"), lo_server[] = _TEXT("Common");
 		ST_Log lo_log({ "Seiralize Resize malloc Fail" });
 		
 		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
@@ -106,10 +110,9 @@ int C_Serialize::M_GetUnusingSize() const
 	return SERIALIZE_BUFFER_SIZE - m_rear - 1;
 }
 
-void C_Serialize::M_InputHeaderSize(int p_header_size)
+void C_Serialize::M_SendAndDisconnect()
 {
-	m_front = m_rear = p_header_size;
-	m_maximum_size = SERIALIZE_BUFFER_SIZE;
+	m_send_and_disconnect = true;
 }
 
 void C_Serialize::M_NetMakeHeader(const char *p_src, const int p_size)

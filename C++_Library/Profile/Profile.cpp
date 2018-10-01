@@ -25,7 +25,7 @@ C_Profile::C_Profile(WORD pa_thread_count) : m_is_lock_on(true), m_file(_TEXT("P
 	s_tls_index = TlsAlloc();
 	if (s_tls_index == TLS_OUT_OF_INDEXES)
 	{
-		TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("NONE");
+		TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("Common");
 		ST_Log lo_log({ "TlsAlloc Error Code: " + to_string(GetLastError()) });
 		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 	}
@@ -150,7 +150,7 @@ C_Profile_Chunk::C_Node::C_Node(const PTCHAR pa_str, __int64 pa_time)
 
 C_Profile_Chunk::~C_Profile_Chunk()
 {
-	int size = m_node_list.size();
+	size_t size = m_node_list.size();
 	for (int i = 0; i < size; i++)
 		delete m_node_list[i];
 
@@ -170,7 +170,7 @@ void Olbbemi::Profile_Begin(const PTCHAR pa_str, int pa_line)
 		BOOL lo_check = TlsSetValue(C_Profile::s_tls_index, lo_tls_ptr);
 		if (lo_check == 0)
 		{
-			TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("NONE");
+			TCHAR lo_action[] = _TEXT("Profile"), lo_server[] = _TEXT("Common");
 			ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
 			_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 		}

@@ -6,7 +6,7 @@
 
 #define MAX_ARRAY 1000
 #define CHECK_SUM 0x41
-#define INITIAL_HEAP_SIZE 1024 * 1024
+#define INITIAL_HEAP_SIZE 1024
 
 #include "Log/Log.h"
 
@@ -79,7 +79,7 @@ namespace Olbbemi
 			{
 				lo_top.unique_index = m_pool_top.unique_index;
 				lo_top.node_address = m_pool_top.node_address;
-				
+
 				if (lo_top.node_address == nullptr)
 					return nullptr;
 
@@ -98,14 +98,14 @@ namespace Olbbemi
 		  * 메모리 풀에서 사용하는 노드는 디폴트 힙이 아닌 HeapCreate 를 통해 별도의 힙을 할당 받아 사용
 		  * max_alloc_count 가 0이 아니면 생성자에서 해당 수치만큼 노드를 생성하여 저장
 		  * placement_new 가 false 이면 각 노드가 생성될 때 한번만 노드 생성자 호출, 소멸할 때 소멸자 호출
-		  * placement_new 가 true 이면 Alloc 함수 호출될 때마다 노드 생성자 호출, Free 함수 호출될 떄마다 노드 소멸자 호출 
+		  * placement_new 가 true 이면 Alloc 함수 호출될 때마다 노드 생성자 호출, Free 함수 호출될 떄마다 노드 소멸자 호출
 		  *-----------------------------------------------------------------------------------------------------------*/
 		C_MemoryPool(int pa_max_alloc_count = 0, bool pa_is_placement_new = false)
 		{
-			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0); 
+			m_heap_handle = HeapCreate(0, INITIAL_HEAP_SIZE, 0);
 			if (m_heap_handle == NULL)
 			{
-				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 				ST_Log lo_log({ "Heap Create Error Code: " + to_string(GetLastError()) });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
@@ -121,7 +121,7 @@ namespace Olbbemi
 					ST_Node *new_node = (ST_Node*)HeapAlloc(m_heap_handle, HEAP_ZERO_MEMORY, sizeof(ST_Node));
 					if (m_is_placementnew == false)
 						new(new_node) ST_Node();
-				
+
 					M_Push(new_node);
 					InterlockedIncrement(&m_alloc_count);
 				}
@@ -150,7 +150,7 @@ namespace Olbbemi
 				lo_free_check = HeapFree(m_heap_handle, 0, lo_garbage);
 				if (lo_free_check == 0)
 				{
-					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 					ST_Log lo_log({ "Heap Free Error Code: " + to_string(GetLastError()) });
 					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 				}
@@ -159,7 +159,7 @@ namespace Olbbemi
 			lo_destroy_check = HeapDestroy(m_heap_handle);
 			if (lo_destroy_check == false)
 			{
-				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 				ST_Log lo_log({ "Heap Destroy Error Code: " + to_string(GetLastError()) });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
@@ -211,21 +211,21 @@ namespace Olbbemi
 			}
 			else
 			{
-				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 				string lo_template_type = typeid(T).name(), lo_param_type = typeid(pData).name();
 
 				ST_Log lo_log({ "Free Type Error -> TemplateType: " + lo_template_type + " ParamType: " + lo_param_type });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 		}
-	
+
 		int	M_GetAllocCount() const // 메모리풀 내부의 전체 개수
 		{
 			return m_alloc_count;
 		}
-	
+
 		int	M_GetUseCount() const // 현재 사용중인 블럭 개수
-		{ 
+		{
 			return m_use_count;
 		}
 	};
@@ -234,11 +234,12 @@ namespace Olbbemi
 	class C_MemoryPoolTLS
 	{
 	private:
+		volatile LONG v_node_count;
+
 		template <class T>
 		class C_Chunk
 		{
 		private:
-
 			/**---------------------------------------------------------------
 			  * 각 Chunk 마다 가질 노드 ( 배열 형태로 존재 )
 			  * data: TLSPool의 Alloc 함수 호출 시 반환될 데이터를 저장하는 변수
@@ -264,8 +265,7 @@ namespace Olbbemi
 					m_node[i].chunk_ptr = this;
 			}
 		};
-
-		volatile LONG v_node_count;
+		
 		DWORD m_tls_index;
 		C_MemoryPool<C_Chunk<T>>* m_chunkpool;
 
@@ -280,27 +280,23 @@ namespace Olbbemi
 			m_tls_index = TlsAlloc();
 			if (m_tls_index == TLS_OUT_OF_INDEXES)
 			{
-				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 				ST_Log lo_log({ "TlsAlloc Error Code: " + to_string(GetLastError()) });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
 			v_node_count = 0;
-			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(10, pa_is_placement_new);
+			m_chunkpool = new C_MemoryPool<C_Chunk<T>>(0, pa_is_placement_new);
 		}
 
-		/**-----------------------------------------------------------------------------------------------------------------------
-		  * 
-	  	  *-----------------------------------------------------------------------------------------------------------------------*/
 		~C_MemoryPoolTLS()
 		{
 			TlsFree(m_tls_index);
-
 			delete m_chunkpool;
 		}
 
 		/**-----------------------------------------------------------------------------------------------------------------------
-	  	  * 직렬화 버퍼를 사용하는 모든 쓰레드에서 해당 쓰레드가 종료될 때 호출하는 함수
+		  * 직렬화 버퍼를 사용하는 모든 쓰레드에서 해당 쓰레드가 종료될 때 호출하는 함수
 		  *-----------------------------------------------------------------------------------------------------------------------*/
 		void M_Terminate()
 		{
@@ -311,7 +307,7 @@ namespace Olbbemi
 			BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
 			if (lo_check == 0)
 			{
-				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 				ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
@@ -321,9 +317,9 @@ namespace Olbbemi
 		}
 
 		/**-----------------------------------------------------------------------------------------------------------------------
-		  * 현재 할당받은 TLS 가 비어 있다면 메모리 풀을 이용하여 Chunk 주소를 얻어와 저장 
+		  * 현재 할당받은 TLS 가 비어 있다면 메모리 풀을 이용하여 Chunk 주소를 얻어와 저장
 		  * TLS 내부에는 Chunk 주소가 저장되어 있고 각 Chunk 내부에는 반환될 데이터가 저장되어 있음
-		  * Alloc 함수가 호출될 때마다 Chunk 내부의 데이터를 반환하고 해당 Chunk에서 할당할 수 있는 데이터가 모두 소진된 경우 TLS를 비움 
+		  * Alloc 함수가 호출될 때마다 Chunk 내부의 데이터를 반환하고 해당 Chunk에서 할당할 수 있는 데이터가 모두 소진된 경우 TLS를 비움
 		  *-----------------------------------------------------------------------------------------------------------------------*/
 		T* M_Alloc()
 		{
@@ -337,7 +333,7 @@ namespace Olbbemi
 				int lo_error = GetLastError();
 				if (lo_error != 0)
 				{
-					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 					ST_Log lo_log({ "TlsGetValue Error Code: " + to_string(GetLastError()) });
 					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 				}
@@ -346,7 +342,7 @@ namespace Olbbemi
 				BOOL lo_check = TlsSetValue(m_tls_index, lo_tls_ptr);
 				if (lo_check == 0)
 				{
-					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 					ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
 					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 				}
@@ -361,7 +357,7 @@ namespace Olbbemi
 				BOOL lo_check = TlsSetValue(m_tls_index, nullptr);
 				if (lo_check == 0)
 				{
-					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("NONE");
+					TCHAR lo_action[] = _TEXT("MemoryPool"), lo_server[] = _TEXT("Common");
 					ST_Log lo_log({ "TlsSetValue Error Code: " + to_string(GetLastError()) });
 					_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 				}

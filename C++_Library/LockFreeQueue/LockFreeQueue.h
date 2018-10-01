@@ -46,11 +46,11 @@ namespace Olbbemi
 		  *-------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 		C_LFQueue()
 		{
-			m_pool = new C_MemoryPool<ST_Node>(50, false);
-			
+			m_pool = new C_MemoryPool<ST_Node>(0, false);
+
 			m_front.node_address = m_pool->M_Alloc();
 			m_front.unique_index = 1;
-			
+
 			m_rear.node_address = m_front.node_address;
 			m_rear.unique_index = 1;
 
@@ -59,7 +59,7 @@ namespace Olbbemi
 		}
 
 		/**--------------------------------------------------------------------
-	  	  * 현재 큐가 가지고 있는 노드를 모두 메모리 풀에 반환 및 사용 카운트 감소
+		  * 현재 큐가 가지고 있는 노드를 모두 메모리 풀에 반환 및 사용 카운트 감소
 		  * 메모리 풀 객체 삭제
 		  *--------------------------------------------------------------------*/
 		~C_LFQueue()
@@ -87,7 +87,7 @@ namespace Olbbemi
 
 			ST_Node* lo_new_node = m_pool->M_Alloc();
 			lo_new_node->data = pa_data;	lo_new_node->link = nullptr;
-			
+
 			while (1)
 			{
 				lo_rear.unique_index = m_rear.unique_index;
@@ -131,11 +131,11 @@ namespace Olbbemi
 
 				if (m_front.node_address == nullptr)
 				{
-					if(m_queue_size != 0)
+					if (m_queue_size != 0)
 						continue;
 					else
 					{
-						TCHAR lo_action[] = _TEXT("LFQueue"), lo_server[] = _TEXT("NONE");
+						TCHAR lo_action[] = _TEXT("LFQueue"), lo_server[] = _TEXT("Common");
 						ST_Log lo_log({ "LFQueue is Null" });
 						_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 					}
@@ -164,7 +164,6 @@ namespace Olbbemi
 		{
 			return m_queue_size;
 		}
-
 	};
 }
 

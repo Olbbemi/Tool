@@ -148,6 +148,9 @@ enum en_PACKET_TYPE
 	//
 	//		WCHAR	ID[20]				// 사용자 ID		. null 포함
 	//		WCHAR	Nickname[20]		// 사용자 닉네임	. null 포함
+		
+	//		WCHAR	GameServerIP[16]	// 접속대상 게임,채팅 서버 정보
+	//		USHORT	GameServerPort
 
 	//		WCHAR	ChatServerIP[16]	// 접속대상 게임,채팅 서버 정보
 	//		USHORT	ChatServerPort

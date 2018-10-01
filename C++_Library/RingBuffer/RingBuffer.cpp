@@ -9,12 +9,12 @@
 
 using namespace Olbbemi;
 
-C_RINGBUFFER::C_RINGBUFFER()
+C_RingBuffer::C_RingBuffer()
 {
 	m_buffer = (char*)malloc(BUFSIZE);
 	if (m_buffer == nullptr)
 	{
-		TCHAR lo_action[] = _TEXT("RINGBUFFER"), lo_server[] = _TEXT("NONE");
+		TCHAR lo_action[] = _TEXT("RINGBUFFER"), lo_server[] = _TEXT("Common");
 		ST_Log lo_log({ "Ringbuffer Malloc Fail" });
 
 		_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
@@ -23,12 +23,12 @@ C_RINGBUFFER::C_RINGBUFFER()
 	m_front = m_rear = 0;
 }
 
-C_RINGBUFFER::~C_RINGBUFFER()
+C_RingBuffer::~C_RingBuffer()
 {
 	free(m_buffer);
 }
 
-int C_RINGBUFFER::M_GetUseSize() const
+int C_RingBuffer::M_GetUseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -38,7 +38,7 @@ int C_RINGBUFFER::M_GetUseSize() const
 		return t_rear - t_front;
 }
 
-int C_RINGBUFFER::M_GetUnuseSize() const
+int C_RingBuffer::M_GetUnuseSize() const
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -48,7 +48,7 @@ int C_RINGBUFFER::M_GetUnuseSize() const
 		return (BUFSIZE - 1) - (t_rear - t_front);
 }
 
-bool C_RINGBUFFER::M_Enqueue(char *pa_data, const int pa_size)
+bool C_RingBuffer::M_Enqueue(char *pa_data, const int pa_size)
 {
 	int gap, unusing_data = M_GetUnuseSize(), t_front = m_front, t_rear = m_rear;
 
@@ -102,7 +102,7 @@ bool C_RINGBUFFER::M_Enqueue(char *pa_data, const int pa_size)
 	return true;
 }
 
-bool C_RINGBUFFER::M_Dequeue(char *pa_dest, const int pa_size)
+bool C_RingBuffer::M_Dequeue(char *pa_dest, const int pa_size)
 {
 	int gap, using_data = M_GetUseSize(), t_front = m_front, t_rear = m_rear;
 
@@ -156,7 +156,7 @@ bool C_RINGBUFFER::M_Dequeue(char *pa_dest, const int pa_size)
 	return true;
 }
 
-bool C_RINGBUFFER::M_Peek(char *pa_dest, const int pa_size, int &pa_return_size)
+bool C_RingBuffer::M_Peek(char *pa_dest, const int pa_size, int &pa_return_size)
 {
 	int gap, temp, using_data = M_GetUseSize(), t_front = m_front, t_rear = m_rear;
 
@@ -204,12 +204,12 @@ bool C_RINGBUFFER::M_Peek(char *pa_dest, const int pa_size, int &pa_return_size)
 	return true;
 }
 
-char* C_RINGBUFFER::M_GetBasicPtr() const
+char* C_RingBuffer::M_GetBasicPtr() const
 {
 	return m_buffer;
 }
 
-char* C_RINGBUFFER::M_GetFrontPtr() const
+char* C_RingBuffer::M_GetFrontPtr() const
 {
 	int front_temp = m_front + 1;
 	if (front_temp == BUFSIZE)
@@ -218,7 +218,7 @@ char* C_RINGBUFFER::M_GetFrontPtr() const
 	return m_buffer + front_temp;
 }
 
-char* C_RINGBUFFER::M_GetRearPtr() const
+char* C_RingBuffer::M_GetRearPtr() const
 {
 	int rear_temp = m_rear + 1;
 	if (rear_temp == BUFSIZE)
@@ -227,7 +227,7 @@ char* C_RINGBUFFER::M_GetRearPtr() const
 	return m_buffer + rear_temp;
 }
 
-void C_RINGBUFFER::M_MoveFront(const int pa_size)
+void C_RingBuffer::M_MoveFront(const int pa_size)
 {
 	int t_front = m_front;
 	t_front += pa_size;
@@ -237,7 +237,7 @@ void C_RINGBUFFER::M_MoveFront(const int pa_size)
 	m_front = t_front;
 }
 
-void C_RINGBUFFER::M_MoveRear(const int pa_size)
+void C_RingBuffer::M_MoveRear(const int pa_size)
 {
 	int t_rear = m_rear;
 	t_rear += pa_size;
@@ -250,7 +250,7 @@ void C_RINGBUFFER::M_MoveRear(const int pa_size)
 /**--------------------------------------------------------------------
   * 원형 큐에서 끊어지지 않고 한번에 얻을 수 있는 사용중인 크기를 얻는 함수
   *--------------------------------------------------------------------*/
-int C_RINGBUFFER::M_LinearRemainFrontSize()
+int C_RingBuffer::M_LinearRemainFrontSize()
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -271,7 +271,7 @@ int C_RINGBUFFER::M_LinearRemainFrontSize()
 /**---------------------------------------------------------------------------
   * 원형 큐에서 끊어지지 않고 한번에 얻을 수 있는 사용중이지 않은 크기를 얻는 함수
   *---------------------------------------------------------------------------*/
-int C_RINGBUFFER::M_LinearRemainRearSize()
+int C_RingBuffer::M_LinearRemainRearSize()
 {
 	int t_front = m_front, t_rear = m_rear;
 
@@ -284,12 +284,12 @@ int C_RINGBUFFER::M_LinearRemainRearSize()
 		return t_front - rear_temp;
 }
 
-void C_RINGBUFFER::M_RingBuffer_Lock()
+void C_RingBuffer::M_RingBuffer_Lock()
 {
 	AcquireSRWLockExclusive(&m_srw);
 }
 
-void C_RINGBUFFER::M_RingBuffer_Unlock()
+void C_RingBuffer::M_RingBuffer_Unlock()
 {
 	ReleaseSRWLockExclusive(&m_srw);
 }

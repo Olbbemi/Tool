@@ -31,7 +31,7 @@ namespace Olbbemi
 		struct ST_Top
 		{
 			ST_Node* node_address;
-			LONG64   unique_index;
+			LONG64 unique_index;
 		};
 
 		volatile LONG m_stack_size;
@@ -44,7 +44,7 @@ namespace Olbbemi
 		{
 			m_pool = new C_MemoryPool<ST_Node>(0, false);
 
-			m_top.node_address = nullptr;
+			m_top.node_address = 0;
 			m_top.unique_index = 1;
 		}
 
@@ -55,7 +55,7 @@ namespace Olbbemi
 		~C_LFStack()
 		{
 			ST_Node* lo_garbage;
-			while (m_top.node_address != nullptr)
+			while (m_top.node_address != 0)
 			{
 				m_stack_size--;
 				lo_garbage = m_top.node_address;
@@ -77,8 +77,8 @@ namespace Olbbemi
 			do
 			{
 				lo_top = m_top.node_address;
-				new_node->link = lo_top;
-			} while (InterlockedCompareExchange64((LONG64*)&m_top, (LONG64)new_node, (LONG64)lo_top) != (LONG64)lo_top);
+				new_node->link = (ST_Node*)lo_top;
+			} while (InterlockedCompareExchange64((LONG64*)&m_top.node_address, (LONG64)new_node, (LONG64)lo_top) != (LONG64)lo_top);
 
 			InterlockedIncrement(&m_stack_size);
 		}
@@ -91,14 +91,13 @@ namespace Olbbemi
 		{
 			if (InterlockedDecrement(&m_stack_size) < 0)
 			{
-				TCHAR lo_action[] = _TEXT("LFStack"), lo_server[] = _TEXT("NONE");
+				TCHAR lo_action[] = _TEXT("LFStack"), lo_server[] = _TEXT("Common");
 				ST_Log lo_log({ "LFStack is Null" });
 				_LOG(__LINE__, LOG_LEVEL_SYSTEM, lo_action, lo_server, lo_log.count, lo_log.log_str);
 			}
 
 			__declspec(align(16)) ST_Top lo_top;
 			T lo_return_value;
-			ST_Node* lo_next = nullptr;
 
 			do
 			{
@@ -106,7 +105,7 @@ namespace Olbbemi
 				lo_top.node_address = m_top.node_address;
 
 				lo_return_value = lo_top.node_address->data;
-			} while (InterlockedCompareExchange128((LONG64*)&m_top, lo_top.unique_index + 1, (LONG64)lo_top.node_address->link, (LONG64*)&lo_top) == 0);
+			} while (InterlockedCompareExchange128((LONG64*)&m_top, lo_top.unique_index + 1, (LONG64)(lo_top.node_address->link), (LONG64*)&lo_top) == 0);
 
 			m_pool->M_Free(lo_top.node_address);
 			return lo_return_value;

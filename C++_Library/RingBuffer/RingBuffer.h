@@ -5,7 +5,7 @@
 
 namespace Olbbemi
 {
-	class C_RINGBUFFER
+	class C_RingBuffer
 	{
 	private:
 		char *m_buffer;
@@ -13,8 +13,8 @@ namespace Olbbemi
 		SRWLOCK m_srw;
 
 	public:
-		C_RINGBUFFER();
-		~C_RINGBUFFER();
+		C_RingBuffer();
+		~C_RingBuffer();
 
 		bool M_Enqueue(char *pa_data, const int pa_size);
 		bool M_Dequeue(char *p_dest, const int pa_size);
